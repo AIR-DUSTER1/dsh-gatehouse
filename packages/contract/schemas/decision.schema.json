@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dsh.local/schemas/decision.schema.json",
+  "title": "ReviewDecisionInput",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "comment", "schedule_at", "expires_at", "timezone", "risk_confirmed"],
+      "properties": {
+        "decision": { "const": "approve" },
+        "comment": { "type": "string", "minLength": 2 },
+        "schedule_at": { "type": "string", "format": "date-time" },
+        "expires_at": { "type": "string", "format": "date-time" },
+        "timezone": { "type": "string", "minLength": 1 },
+        "risk_confirmed": { "const": true }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "comment", "risk_confirmed"],
+      "properties": {
+        "decision": { "enum": ["reject", "request_info"] },
+        "comment": { "type": "string", "minLength": 2 },
+        "risk_confirmed": { "const": true }
+      }
+    }
+  ]
+}

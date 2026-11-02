@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dsh.local/schemas/approval-grant.schema.json",
+  "title": "ApprovalGrant",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "proposal_id", "reviewer", "requirement_hash", "scope_hash", "approved_at", "schedule_at", "expires_at", "consumed_at", "status"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "proposal_id": { "type": "string", "minLength": 1 },
+    "reviewer": { "type": "string", "minLength": 1 },
+    "requirement_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "scope_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "approved_at": { "type": "string", "format": "date-time" },
+    "schedule_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "consumed_at": { "type": ["string", "null"], "format": "date-time" },
+    "status": { "enum": ["active", "consumed", "revoked", "expired"] }
+  }
+}

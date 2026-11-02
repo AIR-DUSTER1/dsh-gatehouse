@@ -1,0 +1,23 @@
+{
+  "name": "dsh-gatehouse",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@12.5.1",
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c cyan,magenta \"pnpm --filter @gatehouse/server dev\" \"pnpm --filter @gatehouse/web dev\"",
+    "dev:server": "pnpm --filter @gatehouse/server dev",
+    "dev:web": "pnpm --filter @gatehouse/web dev",
+    "build": "pnpm --filter @gatehouse/contract build && pnpm --filter @gatehouse/server build && pnpm --filter @gatehouse/web build",
+    "test": "pnpm --filter @gatehouse/contract test && pnpm --filter @gatehouse/server test && pnpm --filter @gatehouse/web test",
+    "typecheck": "pnpm --filter @gatehouse/contract typecheck && pnpm --filter @gatehouse/server typecheck && pnpm --filter @gatehouse/web typecheck",
+    "seed": "pnpm --filter @gatehouse/server seed",
+    "start": "pnpm --filter @gatehouse/server start",
+    "browser:smoke": "node scripts/browser-smoke.mjs"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "playwright": "^1.64.1",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

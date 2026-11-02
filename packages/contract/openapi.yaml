@@ -1,0 +1,199 @@
+openapi: 3.1.0
+info:
+  title: dsh-superagent Console API
+  version: 1.0.0
+  description: 人工复核、审批、排期、执行投影与审计 API。
+servers:
+  - url: http://127.0.0.1:8787
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  responses:
+    Unauthorized:
+      description: 未登录或会话过期
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, action, trace_id]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            action: { type: string }
+            trace_id: { type: string }
+    DecisionInput:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [decision, comment, schedule_at, expires_at, timezone, risk_confirmed]
+          properties:
+            decision: { const: approve }
+            comment: { type: string, minLength: 2 }
+            schedule_at: { type: string, format: date-time }
+            expires_at: { type: string, format: date-time }
+            timezone: { type: string }
+            risk_confirmed: { const: true }
+        - type: object
+          additionalProperties: false
+          required: [decision, comment, risk_confirmed]
+          properties:
+            decision: { enum: [reject, request_info] }
+            comment: { type: string, minLength: 2 }
+            risk_confirmed: { const: true }
+paths:
+  /health:
+    get:
+      security: []
+      summary: 控制面存活检查
+      responses:
+        '200': { description: OK }
+  /ready:
+    get:
+      security: []
+      summary: 控制面就绪检查
+      responses:
+        '200': { description: Ready }
+  /api/auth/login:
+    post:
+      security: []
+      summary: 登录
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200': { description: 登录成功 }
+        '401': { description: 凭证错误 }
+  /api/auth/me:
+    get:
+      summary: 当前用户
+      responses:
+        '200': { description: 当前用户 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/plugin/events:
+    post:
+      security: []
+      summary: dsh-superagent 事件入口（HMAC）
+      parameters:
+        - { in: header, name: x-timestamp, required: true, schema: { type: string } }
+        - { in: header, name: x-nonce, required: true, schema: { type: string } }
+        - { in: header, name: x-signature, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: ./schemas/plugin-event.schema.json }
+      responses:
+        '200': { description: 事件已处理或幂等重放 }
+        '401': { description: 签名无效 }
+        '409': { description: nonce 重放 }
+  /api/review-cases:
+    get:
+      summary: 复核队列
+      parameters:
+        - { in: query, name: status, schema: { type: string } }
+        - { in: query, name: risk, schema: { type: string } }
+        - { in: query, name: source, schema: { enum: [feishu, github] } }
+        - { in: query, name: search, schema: { type: string } }
+        - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
+        - { in: query, name: page_size, schema: { type: integer, maximum: 100, default: 20 } }
+      responses:
+        '200': { description: 分页队列 }
+  /api/review-cases/{id}:
+    get:
+      summary: 需求详情
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: 需求、提案、决策、Grant、排期与审计 }
+        '404': { description: 不存在 }
+  /api/proposals/{id}:
+    get:
+      summary: 提案详情
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: 提案事实 }
+  /api/proposals/{id}/decision:
+    post:
+      summary: 提交人工审批
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { in: header, name: Idempotency-Key, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DecisionInput' }
+      responses:
+        '200': { description: 决策已记录或幂等重放 }
+        '403': { description: viewer 或申请人自审 }
+        '409': { description: 状态或幂等冲突 }
+  /api/dashboard:
+    get:
+      summary: 统计指标
+      responses:
+        '200': { description: 工作台统计 }
+  /api/schedule:
+    get:
+      summary: 排期列表与并发指标
+      responses:
+        '200': { description: 排期列表 }
+  /api/schedule/{id}/pause:
+    post:
+      summary: 暂停排期
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: 已暂停 }
+        '403': { description: 无权限 }
+  /api/schedule/{id}/resume:
+    post:
+      summary: 恢复排期
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: 已恢复 }
+        '409': { description: 已过期或状态不允许 }
+  /api/audit:
+    get:
+      summary: 审计查询
+      parameters:
+        - { in: query, name: entity_type, schema: { type: string } }
+        - { in: query, name: entity_id, schema: { type: string } }
+        - { in: query, name: action, schema: { type: string } }
+        - { in: query, name: page, schema: { type: integer, default: 1 } }
+        - { in: query, name: page_size, schema: { type: integer, default: 30 } }
+      responses:
+        '200': { description: 只追加审计事件 }
+  /api/settings:
+    get:
+      summary: 系统配置与成员
+      responses:
+        '200': { description: 脱敏配置 }
+    put:
+      summary: 修改调度并发（admin）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [max_concurrency]
+              properties:
+                max_concurrency: { type: integer, minimum: 1, maximum: 20 }
+      responses:
+        '200': { description: 已保存 }
+        '403': { description: 非管理员 }

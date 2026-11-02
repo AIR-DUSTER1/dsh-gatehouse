@@ -1,0 +1,101 @@
+import { Link } from 'react-router-dom';
+import { Avatar, Button, Card, Col, Empty, Flex, Progress, Row, Space, Statistic, Tag, Timeline, Typography } from 'antd';
+import {
+  AuditOutlined, CheckCircleOutlined, ClockCircleOutlined, SafetyCertificateOutlined, ThunderboltOutlined, WarningOutlined,
+} from '@ant-design/icons';
+import type { DashboardResponse, ReviewQueueResponse } from '../../types/api';
+import { useApiData } from '../../hooks/useApiData';
+import { useAuth } from '../../hooks/useAuth';
+import { actionLabels, formatDate, relativeTime, riskLabels } from '../../lib/format';
+import { ErrorState, LoadingState, PageHeader, RiskBadge, SourceBadge } from '../../components/ui';
+
+const { Text, Title } = Typography;
+
+export function DashboardPage() {
+  const { user } = useAuth();
+  const { data, loading, error, reload } = useApiData<DashboardResponse>('/api/dashboard');
+  const { data: queue } = useApiData<ReviewQueueResponse>('/api/review-cases?status=pending_review&page=1&page_size=4');
+  if (loading) return <LoadingState />;
+  if (error || !data) return <ErrorState message={error?.message ?? '工作台加载失败'} action={error?.body.error.action} onRetry={reload} />;
+  const greeting = new Date().getHours() < 12 ? '早上好' : new Date().getHours() < 18 ? '下午好' : '晚上好';
+
+  const metrics = [
+    { label: '等待复核', value: data.pending_review, suffix: '项', icon: <AuditOutlined />, color: '#2563eb', hint: '建议在 30 分钟内完成首次响应' },
+    { label: '高风险需求', value: data.high_risk, suffix: '项', icon: <WarningOutlined />, color: '#d46b08', hint: '重点确认范围、影响与测试计划' },
+    { label: '平均复核时长', value: data.average_review_minutes, suffix: '分钟', icon: <ClockCircleOutlined />, color: '#0891b2', hint: `${data.approved_sla_rate}% 在 SLA 内完成` },
+    { label: '执行成功率', value: data.execution_success_rate, suffix: '%', icon: <CheckCircleOutlined />, color: '#16855b', hint: '按已完成与失败任务统计' },
+  ];
+
+  return (
+    <div className="page-stack">
+      <PageHeader title={`${greeting}，${user?.name ?? '复核人'}`} description="查看当前待办、风险分布和最近执行动态。" actions={<Link to="/review"><Button type="primary">进入复核中心</Button></Link>} />
+
+      <Row gutter={[12, 12]}>
+        {metrics.map(metric => (
+          <Col xs={24} sm={12} xl={6} key={metric.label}>
+            <Card className="metric-card" variant="borderless">
+              <Flex justify="space-between" align="flex-start">
+                <div><Text type="secondary">{metric.label}</Text><Statistic value={metric.value} suffix={metric.suffix} /></div>
+                <span className="metric-icon" style={{ color: metric.color, background: `${metric.color}12` }}>{metric.icon}</span>
+              </Flex>
+              <Text type="secondary" className="metric-hint">{metric.hint}</Text>
+            </Card>
+          </Col>
+        ))}
+      </Row>
+
+      <Row gutter={[12, 12]}>
+        <Col xs={24} xl={16}>
+          <Card title="优先复核" extra={<Link to="/review">查看全部</Link>} variant="borderless">
+            <Flex vertical gap={10}>
+              {queue?.items.length ? queue.items.map(item => (
+                <Card key={item.id} size="small">
+                  <Flex align="center" gap={12}>
+                    <Avatar className="person-avatar">{item.requester.slice(-2)}</Avatar>
+                    <div className="focus-copy">
+                      <Space wrap><Link to={`/review/${item.id}`}><Text strong>{item.title}</Text></Link><RiskBadge risk={item.risk_level} /><SourceBadge source={item.source} /></Space>
+                      <Text type="secondary" ellipsis>{item.latest_proposal_summary}</Text>
+                      <Text type="secondary" className="small-text">{item.requester} · {relativeTime(item.created_at)}</Text>
+                    </div>
+                    <Link to={`/review/${item.id}`} className="push-right">查看详情</Link>
+                  </Flex>
+                </Card>
+              )) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无待复核需求" />}
+            </Flex>
+          </Card>
+        </Col>
+        <Col xs={24} xl={8}>
+          <Card title="风险分布" extra={<Tag>{data.total_cases} 项</Tag>} variant="borderless" className="full-height-card">
+            <Flex vertical gap={18}>
+              {(Object.entries(data.risk_distribution) as Array<[keyof typeof data.risk_distribution, number]>).map(([risk, count]) => (
+                <div key={risk}>
+                  <Flex justify="space-between"><Text>{riskLabels[risk]}</Text><Text strong>{count}</Text></Flex>
+                  <Progress percent={Math.round(count / Math.max(1, data.total_cases) * 100)} showInfo={false} size="small" strokeColor={risk === 'critical' ? '#cf1322' : risk === 'high' ? '#d46b08' : risk === 'medium' ? '#d4a72c' : '#389e0d'} />
+                </div>
+              ))}
+            </Flex>
+            <div className="risk-hint"><SafetyCertificateOutlined /><Text type="secondary">高风险需求需要完整确认影响文件、回滚方案和测试计划。</Text></div>
+          </Card>
+        </Col>
+      </Row>
+
+      <Row gutter={[12, 12]}>
+        <Col xs={24} xl={10}>
+          <Card title="规则命中" variant="borderless">
+            <Flex vertical>
+              {data.rule_hits.length ? data.rule_hits.map((item, index) => <Flex key={item.rule} justify="space-between" align="center" className="rule-row"><Space><Text type="secondary">{String(index + 1).padStart(2, '0')}</Text><Tag>{item.rule}</Tag></Space><Text strong>{item.count}</Text></Flex>) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无规则命中" />}
+            </Flex>
+          </Card>
+        </Col>
+        <Col xs={24} xl={14}>
+          <Card title="最近动态" extra={<Link to="/audit">审计日志</Link>} variant="borderless">
+            <Timeline items={data.recent_activity.map(event => ({
+              icon: event.action.includes('finished') ? <CheckCircleOutlined /> : event.action.includes('failed') ? <WarningOutlined /> : <ThunderboltOutlined />,
+              content: <Flex justify="space-between" gap={12}><div><Text strong>{actionLabels[event.action] ?? event.action}</Text><br /><Text type="secondary" className="small-text">{event.actor} · {event.entity_id}</Text></div><Text type="secondary" className="small-text">{formatDate(event.created_at)}</Text></Flex>,
+            }))} />
+          </Card>
+        </Col>
+      </Row>
+    </div>
+  );
+}
