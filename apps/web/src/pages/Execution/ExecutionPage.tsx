@@ -18,14 +18,14 @@ export function ExecutionPage() {
 
   return (
     <div className="page-stack">
-      <PageHeader title="交付记录" description="查看 dsh-superagent 的 Worker 状态、PR 交付链接与失败信息。" actions={<Button icon={<ReloadOutlined />} onClick={reload}>刷新</Button>} />
+      <PageHeader eyebrow="SEC.04 / DELIVERY LOG" title="交付记录" description="查看 dsh-superagent 的 Worker 状态、PR 交付链接与失败信息。" actions={<Button icon={<ReloadOutlined />} onClick={reload}>刷新</Button>} />
       <Row gutter={[12, 12]}>
         {[
-          { label: '执行成功率', value: finished ? Math.round(completed / finished * 100) : 0, suffix: '%', icon: <CheckCircleOutlined />, color: '#16855b' },
-          { label: '已完成交付', value: completed, icon: <CheckCircleOutlined />, color: '#1677ff' },
-          { label: '失败记录', value: records.filter(item => item.status === 'failed').length, icon: <WarningOutlined />, color: '#cf1322' },
-          { label: '正在执行', value: records.filter(item => item.status === 'executing').length, icon: <ClockCircleOutlined />, color: '#722ed1' },
-        ].map(item => <Col xs={12} lg={6} key={item.label}><Card variant="borderless" className="metric-card"><Flex justify="space-between"><div><Text type="secondary">{item.label}</Text><Statistic value={item.value} suffix={item.suffix} /></div><span className="metric-icon" style={{ color: item.color, background: `${item.color}12` }}>{item.icon}</span></Flex></Card></Col>)}
+          { label: '执行成功率', value: finished ? Math.round(completed / finished * 100) : 0, suffix: '%', icon: <CheckCircleOutlined />, color: '#2c7a4b' },
+          { label: '已完成交付', value: completed, icon: <CheckCircleOutlined />, color: '#191817' },
+          { label: '失败记录', value: records.filter(item => item.status === 'failed').length, icon: <WarningOutlined />, color: '#c73325' },
+          { label: '正在执行', value: records.filter(item => item.status === 'executing').length, icon: <ClockCircleOutlined />, color: '#e8480c' },
+        ].map((item, index) => <Col xs={12} lg={6} key={item.label}><Card variant="borderless" className="metric-card"><Flex justify="space-between"><div><Flex align="center" gap={8}><span className="index-no">M.{String(index + 1).padStart(2, '0')}</span><Text type="secondary">{item.label}</Text></Flex><Statistic value={item.value} suffix={item.suffix} /></div><span className="metric-icon" style={{ color: item.color }}>{item.icon}</span></Flex></Card></Col>)}
       </Row>
       <Card variant="borderless">
         {records.length ? <Flex vertical gap={10}>{records.map(item => (

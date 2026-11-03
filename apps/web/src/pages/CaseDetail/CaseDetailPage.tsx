@@ -69,7 +69,7 @@ export function CaseDetailPage() {
     <div className="page-stack detail-page">
       <Flex justify="space-between" align="center">
         <Link to="/review"><Button type="text" icon={<ArrowLeftOutlined />}>返回复核中心</Button></Link>
-        <Text type="secondary" className="small-text">CASE / {data.review_case.id}</Text>
+        <span className="case-no">CASE / {data.review_case.id}</span>
       </Flex>
 
       <Card variant="borderless" className="detail-header-card">
@@ -86,7 +86,7 @@ export function CaseDetailPage() {
       <Row gutter={[14, 14]} align="top">
         <Col xs={24} xl={14}>
           <Flex vertical gap={14}>
-            <Card title={<Space><FileTextOutlined />原始需求</Space>} extra={<Text copyable={{ text: data.review_case.requirement_text }}>复制</Text>} variant="borderless">
+            <Card title={<Space><FileTextOutlined />A / 原始需求</Space>} extra={<Text copyable={{ text: data.review_case.requirement_text }}>复制</Text>} variant="borderless">
               <Paragraph className="requirement-text">{data.review_case.requirement_text}</Paragraph>
               <Descriptions column={{ xs: 1, md: 2 }} size="small" items={[
                 { key: 'context', label: '来源上下文', children: data.review_case.source_context || '—' },
@@ -96,20 +96,20 @@ export function CaseDetailPage() {
               ]} />
             </Card>
 
-            <Card title={<Space><SafetyCertificateOutlined />Agent 调研结论</Space>} extra={<Tag color="purple">dsh-superagent</Tag>} variant="borderless">
+            <Card title={<Space><SafetyCertificateOutlined />B / Agent 调研结论</Space>} extra={<span className="mono-label">dsh-superagent</span>} variant="borderless">
               <Paragraph>{proposal.summary}</Paragraph>
               <Alert type={proposal.risk === 'critical' || proposal.risk === 'high' ? 'warning' : 'info'} showIcon icon={<WarningOutlined />} title={`${riskLabels[proposal.risk]} · 风险说明`} description={proposal.risk_reason} />
               <Space wrap className="tag-row">{proposal.rule_hits.map(rule => <Tag key={rule}>{rule}</Tag>)}</Space>
             </Card>
 
-            <Card title="历史提案版本" variant="borderless">
+            <Card title="C / 历史提案版本" variant="borderless">
               <Timeline items={data.proposals.map((version, index) => ({
-                color: index === 0 ? 'blue' : 'gray',
+                color: index === 0 ? '#e8480c' : '#a39e93',
                 content: <div><Space><Text strong>{index === 0 ? '当前评估' : '历史评估'}</Text><Tag>v{version.assessment_revision}</Tag><StatusBadge status={version.status} /></Space><Paragraph type="secondary" className="version-summary">{version.summary}</Paragraph><Text type="secondary" className="small-text">{formatFullDate(version.created_at)}</Text></div>,
               }))} />
             </Card>
 
-            <Card title="决策与审计" variant="borderless">
+            <Card title="D / 决策与审计" variant="borderless">
               {latestDecision ? <Alert type={latestDecision.decision === 'approve' ? 'success' : latestDecision.decision === 'reject' ? 'error' : 'warning'} showIcon title={decisionLabels[latestDecision.decision]} description={<><div>{latestDecision.comment}</div><Text type="secondary" className="small-text">{latestDecision.reviewer} · {formatFullDate(latestDecision.created_at)}</Text></>} /> : <Text type="secondary">尚未产生人工决策。</Text>}
               <Timeline className="audit-timeline" items={data.audit_events.map(event => ({ content: <Flex justify="space-between" gap={12}><div><Text strong>{actionLabels[event.action] ?? event.action}</Text><br /><Text type="secondary" className="small-text">{event.actor}</Text></div><Text type="secondary" className="small-text">{formatFullDate(event.created_at)}</Text></Flex> }))} />
             </Card>
@@ -118,21 +118,21 @@ export function CaseDetailPage() {
 
         <Col xs={24} xl={10}>
           <Flex vertical gap={14}>
-            <Card title="建议执行范围" extra={<Tag>REV {proposal.assessment_revision}</Tag>} variant="borderless">
-              <Flex vertical gap={9}>{proposal.scope.map(item => <Flex key={item} gap={8} align="flex-start"><CheckCircleOutlined className="success-icon" /><Text>{item}</Text></Flex>)}</Flex>
+            <Card title="E / 建议执行范围" extra={<span className="mono-label">REV {proposal.assessment_revision}</span>} variant="borderless">
+              <Flex vertical gap={9}>{proposal.scope.map((item, index) => <Flex key={item} gap={10} align="flex-start"><span className="index-no">{String(index + 1).padStart(2, '0')}</span><Text>{item}</Text></Flex>)}</Flex>
               <Divider />
               <Text type="secondary">Scope hash</Text><br /><Text code copyable={{ text: proposal.scope_hash }}>{shortHash(proposal.scope_hash)}</Text>
             </Card>
 
-            <Card title={<Space><CodeOutlined />影响文件</Space>} extra={<Tag>{proposal.impact_files.length} 个</Tag>} variant="borderless">
+            <Card title={<Space><CodeOutlined />F / 影响文件</Space>} extra={<span className="mono-label">{proposal.impact_files.length} 个</span>} variant="borderless">
               {proposal.impact_files.length ? <Flex vertical gap={7}>{proposal.impact_files.map(file => <Text key={file} code copyable>{file}</Text>)}</Flex> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="未识别到文件级影响" />}
             </Card>
 
-            <Card title="验证计划" variant="borderless">
-              <Flex vertical gap={10}>{proposal.test_plan.map((item, index) => <Flex key={item} gap={8} align="flex-start"><Tag>{index + 1}</Tag><Text>{item}</Text></Flex>)}</Flex>
+            <Card title="G / 验证计划" variant="borderless">
+              <Flex vertical gap={10}>{proposal.test_plan.map((item, index) => <Flex key={item} gap={10} align="flex-start"><span className="index-no">T.{index + 1}</span><Text>{item}</Text></Flex>)}</Flex>
             </Card>
 
-            <Card title="成本与授权" variant="borderless">
+            <Card title="H / 成本与授权" variant="borderless">
               <Descriptions column={1} size="small" items={[
                 { key: 'cost', label: '预估成本', children: proposal.estimated_cost },
                 { key: 'risk', label: '风险等级', children: riskLabels[proposal.risk] },
@@ -144,7 +144,7 @@ export function CaseDetailPage() {
               ]} />
             </Card>
 
-            {proposal.status === 'pending_review' && <Card title="人工复核决策" variant="borderless" className="decision-card">
+            {proposal.status === 'pending_review' && <Card title="I / 人工复核决策" variant="borderless" className="decision-card">
               {!isReviewer && <Alert type="info" showIcon title="当前账号为只读成员，不能提交审批决策。" />}
               {selfApproval && isReviewer && <Alert type="warning" showIcon title="申请人与当前账号相同，不能批准自己的需求；仍可驳回或要求补充。" />}
               <Flex gap={8} wrap className="decision-actions">

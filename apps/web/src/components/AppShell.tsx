@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Avatar, Badge, Button, Drawer, Dropdown, Flex, Grid, Layout, Menu, Space, Tag, Typography } from 'antd';
+import { Avatar, Button, Drawer, Dropdown, Flex, Grid, Layout, Menu, Space, Typography } from 'antd';
 import {
   AuditOutlined, BellOutlined, CalendarOutlined, ControlOutlined, DashboardOutlined, DownOutlined,
   LogoutOutlined, MenuOutlined, RocketOutlined, SafetyCertificateOutlined, SettingOutlined,
@@ -11,14 +11,18 @@ import { roleLabels } from '../lib/format';
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
 
+function navLabel(index: string, label: string) {
+  return <span><span className="nav-index">{index}</span>{label}</span>;
+}
+
 const primaryItems = [
-  { key: '/', icon: <DashboardOutlined />, label: '工作台' },
-  { key: '/review', icon: <AuditOutlined />, label: '复核中心' },
-  { key: '/schedule', icon: <CalendarOutlined />, label: '执行调度' },
-  { key: '/executions', icon: <RocketOutlined />, label: '交付记录' },
-  { key: '/audit', icon: <ControlOutlined />, label: '审计日志' },
+  { key: '/', icon: <DashboardOutlined />, label: navLabel('01', '工作台') },
+  { key: '/review', icon: <AuditOutlined />, label: navLabel('02', '复核中心') },
+  { key: '/schedule', icon: <CalendarOutlined />, label: navLabel('03', '执行调度') },
+  { key: '/executions', icon: <RocketOutlined />, label: navLabel('04', '交付记录') },
+  { key: '/audit', icon: <ControlOutlined />, label: navLabel('05', '审计日志') },
 ];
-const settingsItem = { key: '/settings', icon: <SettingOutlined />, label: '系统设置' };
+const settingsItem = { key: '/settings', icon: <SettingOutlined />, label: navLabel('06', '系统设置') };
 const titles: Record<string, { title: string; section: string }> = {
   '/': { title: '工作台', section: '总览' }, '/review': { title: '复核中心', section: '人工决策' },
   '/schedule': { title: '执行调度', section: '排期控制' }, '/executions': { title: '交付记录', section: '执行结果' },
@@ -39,6 +43,18 @@ function Navigation({ onNavigate }: { onNavigate?: () => void }) {
       className="main-navigation"
     />
   );
+}
+
+function HeaderClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const text = new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).format(now);
+  return <Text className="header-clock">UTC+8 {text}</Text>;
 }
 
 export function AppShell() {
@@ -76,7 +92,7 @@ export function AppShell() {
         <Menu theme="dark" mode="inline" selectedKeys={[location.pathname]} items={[settingsItem]} onClick={({ key }) => { navigate(key); setDrawerOpen(false); }} />
       </div>
       <div className="sidebar-bottom">
-        <div className="runtime-status"><Badge status="success" /><div><Text>控制面运行正常</Text><Text type="secondary">outbox 自动重试已启用</Text></div></div>
+        <div className="runtime-status"><span className="lamp on" /><div><Text>控制面运行正常</Text><Text type="secondary">outbox 自动重试已启用</Text></div></div>
         <Flex align="center" gap={9} className="signed-user">
           <Avatar className="person-avatar">{user?.name?.slice(-2)}</Avatar>
           <div><Text strong>{user?.name}</Text><Text type="secondary">{user ? roleLabels[user.role] : ''}</Text></div>
@@ -89,17 +105,18 @@ export function AppShell() {
   return (
     <Layout className="app-layout">
       {screens.lg ? <Sider width={232} className="app-sider">{sidebarContent}</Sider> : null}
-      <Drawer placement="left" size={252} closable={false} open={!screens.lg && drawerOpen} onClose={() => setDrawerOpen(false)} styles={{ body: { padding: 0, background: '#101828' } }}>
+      <Drawer placement="left" size={252} closable={false} open={!screens.lg && drawerOpen} onClose={() => setDrawerOpen(false)} styles={{ body: { padding: 0, background: '#141311' } }}>
         <div className="app-sider drawer-sider">{sidebarContent}</div>
       </Drawer>
       <Layout>
         <Header className="app-header">
           <Flex align="center" gap={10}>
             {!screens.lg && <Button type="text" aria-label="打开导航" icon={<MenuOutlined />} onClick={() => setDrawerOpen(true)} />}
-            <Text type="secondary">{routeInfo.section}</Text><span className="header-divider">/</span><Text strong>{routeInfo.title}</Text>
+            <span className="header-crumb"><Text type="secondary">{routeInfo.section}</Text> <span className="header-divider">/</span> <Text strong>{routeInfo.title}</Text></span>
           </Flex>
-          <Space size={14}>
-            <Badge dot offset={[-3, 3]}><Button type="text" icon={<BellOutlined />} /></Badge>
+          <Space size={16}>
+            <HeaderClock />
+            <Button type="text" icon={<BellOutlined />} aria-label="通知" />
             <Dropdown menu={userMenu} trigger={['click']} placement="bottomRight">
               <Button type="text" className="header-user"><Avatar size={26} className="person-avatar">{user?.name?.slice(-2)}</Avatar>{user?.name}<DownOutlined /></Button>
             </Dropdown>
@@ -110,4 +127,3 @@ export function AppShell() {
     </Layout>
   );
 }
-

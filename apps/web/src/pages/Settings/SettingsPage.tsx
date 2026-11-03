@@ -42,7 +42,7 @@ export function SettingsPage() {
 
   return (
     <div className="page-stack">
-      <PageHeader title="系统设置" description="配置执行器连接、调度并发与项目成员权限。敏感密钥只通过环境变量注入。" actions={<Button icon={<ReloadOutlined />} onClick={reload}>刷新</Button>} />
+      <PageHeader eyebrow="SEC.06 / SYSTEM" title="系统设置" description="配置执行器连接、调度并发与项目成员权限。敏感密钥只通过环境变量注入。" actions={<Button icon={<ReloadOutlined />} onClick={reload}>刷新</Button>} />
       <Row gutter={[14, 14]}>
         <Col xs={24} xl={12}>
           <Card variant="borderless" title={<Space><ApiOutlined />dsh-superagent 连接</Space>} extra={<Tag color="green">已连接</Tag>}>

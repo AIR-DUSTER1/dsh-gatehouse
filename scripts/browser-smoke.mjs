@@ -17,6 +17,7 @@ function assert(condition, message) { if (!condition) throw new Error(message); 
 try {
   await page.goto('http://127.0.0.1:5173/login', { waitUntil: 'networkidle' });
   await page.screenshot({ path: '.run/screens/01-login.png', fullPage: true });
+  await page.getByRole('heading', { name: '登录控制台' }).waitFor();
   assert(await page.getByRole('heading', { name: '登录控制台' }).isVisible(), '登录页未渲染');
 
   await page.getByLabel('工作邮箱').fill('li@example.com');
@@ -34,7 +35,7 @@ try {
 
   await page.locator('table tbody tr:not(.ant-table-measure-row) a').first().click();
   await page.waitForURL('**/review/*');
-  await page.getByText('人工复核决策', { exact: true }).waitFor();
+  await page.getByText('I / 人工复核决策', { exact: true }).waitFor();
   await page.screenshot({ path: '.run/screens/04-case-detail.png', fullPage: true });
 
   await page.locator('.decision-actions').getByRole('button', { name: '批准并排期' }).click();

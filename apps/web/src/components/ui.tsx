@@ -1,26 +1,32 @@
 import type { ReactNode } from 'react';
-import { Alert, Avatar as AntAvatar, Empty, Flex, Skeleton, Spin, Tag, Typography, Modal as AntModal } from 'antd';
+import { Alert, Avatar as AntAvatar, Empty, Flex, Skeleton, Typography, Modal as AntModal } from 'antd';
 import type { CaseStatus, RiskLevel, ScheduleStatus } from '@gatehouse/contract';
 import { riskLabels, statusLabels } from '../lib/format';
 
 const { Title, Paragraph, Text } = Typography;
 
-const statusColors: Record<CaseStatus | ScheduleStatus, string> = {
-  pending_review: 'orange', info_requested: 'gold', approved: 'cyan', rejected: 'red', superseded: 'default',
-  scheduled: 'blue', paused: 'gold', executing: 'purple', completed: 'green', failed: 'red', cancelled: 'default',
+type BadgeTone = 'neutral' | 'ok' | 'warn' | 'bad' | 'signal' | 'ink';
+
+const statusTones: Record<CaseStatus | ScheduleStatus, BadgeTone> = {
+  pending_review: 'signal', info_requested: 'warn', approved: 'ink', rejected: 'bad', superseded: 'neutral',
+  scheduled: 'ink', paused: 'warn', executing: 'signal', completed: 'ok', failed: 'bad', cancelled: 'neutral',
 };
-const riskColors: Record<RiskLevel, string> = { low: 'green', medium: 'gold', high: 'orange', critical: 'red' };
+const riskTones: Record<RiskLevel, BadgeTone> = { low: 'neutral', medium: 'warn', high: 'signal', critical: 'bad' };
+
+export function Badge({ tone = 'neutral', children }: { tone?: BadgeTone; children: ReactNode }) {
+  return <span className={`badge badge--${tone}`}>{children}</span>;
+}
 
 export function StatusBadge({ status }: { status: CaseStatus | ScheduleStatus }) {
-  return <Tag color={statusColors[status]}>{statusLabels[status]}</Tag>;
+  return <Badge tone={statusTones[status]}>{statusLabels[status]}</Badge>;
 }
 
 export function RiskBadge({ risk }: { risk: RiskLevel; subtle?: boolean }) {
-  return <Tag color={riskColors[risk]}>{riskLabels[risk]}</Tag>;
+  return <Badge tone={riskTones[risk]}>{riskLabels[risk]}</Badge>;
 }
 
 export function SourceBadge({ source }: { source: 'feishu' | 'github' }) {
-  return <Tag color={source === 'feishu' ? 'cyan' : 'default'}>{source === 'feishu' ? '飞书' : 'GitHub'}</Tag>;
+  return <Badge tone={source === 'feishu' ? 'ink' : 'neutral'}>{source === 'feishu' ? '飞书' : 'GitHub'}</Badge>;
 }
 
 export function PageHeader({ eyebrow, title, description, actions }: { eyebrow?: string; title: string; description?: string; actions?: ReactNode }) {
@@ -37,7 +43,13 @@ export function PageHeader({ eyebrow, title, description, actions }: { eyebrow?:
 }
 
 export function LoadingState({ label = '正在加载数据…' }: { label?: string }) {
-  return <Flex className="state-panel" vertical align="center" justify="center" gap={12}><Spin size="large" /><Text type="secondary">{label}</Text></Flex>;
+  return (
+    <Flex className="state-panel boot-loader" vertical align="center" justify="center" gap={16}>
+      <span className="loader-mark" aria-hidden />
+      <span className="loader-track" aria-hidden><span className="loader-bar" /></span>
+      <Text type="secondary" className="loader-label">{label}</Text>
+    </Flex>
+  );
 }
 
 export function ErrorState({ message, action, onRetry }: { message: string; action?: string | undefined; onRetry?: (() => void) | undefined }) {

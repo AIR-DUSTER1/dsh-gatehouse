@@ -30,6 +30,7 @@ export function ReviewQueuePage() {
   const { data, loading, error, reload } = useApiData<ReviewQueueResponse>(path);
 
   const columns: ColumnsType<ReviewQueueItem> = [
+    { title: 'NO.', key: 'index', width: 58, render: (_, __, index) => <span className="index-no">{String((page - 1) * (data?.page_size ?? 12) + index + 1).padStart(3, '0')}</span> },
     { title: '需求', dataIndex: 'title', width: 360, render: (_, item) => <div className="table-title"><a href={`/review/${item.id}`}>{item.title}</a><Text type="secondary" ellipsis>{item.latest_proposal_summary}</Text></div> },
     { title: '来源', dataIndex: 'source', width: 96, render: value => <SourceBadge source={value} /> },
     { title: '提出人', dataIndex: 'requester', width: 120, render: value => <Space><Avatar name={value} size="sm" /><Text>{value}</Text></Space> },
@@ -42,7 +43,7 @@ export function ReviewQueuePage() {
 
   return (
     <div className="page-stack">
-      <PageHeader title="复核中心" description="所有 dsh-superagent 评估完成的 Proposal 在此进入人工决策；批准前不会触发执行。" actions={<Button icon={<ReloadOutlined />} onClick={reload}>刷新</Button>} />
+      <PageHeader eyebrow="SEC.02 / REVIEW QUEUE" title="复核中心" description="所有 dsh-superagent 评估完成的 Proposal 在此进入人工决策；批准前不会触发执行。" actions={<Button icon={<ReloadOutlined />} onClick={reload}>刷新</Button>} />
       {error && <ErrorState message={error.message} action={error.body.error.action} onRetry={reload} />}
       <Card variant="borderless" className="filter-card">
         <Tabs activeKey={status} items={statusTabs} onChange={key => { setStatus(key); setPage(1); }} />
@@ -59,7 +60,7 @@ export function ReviewQueuePage() {
           columns={columns}
           dataSource={data?.items ?? []}
           loading={loading}
-          scroll={{ x: 1100 }}
+          scroll={{ x: 1160 }}
           pagination={{ current: page, pageSize: data?.page_size ?? 12, total: data?.total ?? 0, showSizeChanger: false, onChange: setPage, showTotal: total => `共 ${total} 条` }}
           locale={{ emptyText: '暂无符合条件的需求' }}
         />

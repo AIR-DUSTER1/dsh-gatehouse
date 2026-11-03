@@ -36,7 +36,7 @@ export function LoginPage() {
       <section className="login-context">
         <Flex align="center" gap={10} className="login-brand"><span className="brand-symbol"><SafetyCertificateOutlined /></span><span>Gatehouse</span></Flex>
         <div className="login-message">
-          <Tag variant="filled" color="blue">Human-in-the-loop</Tag>
+          <Tag>Human-in-the-loop</Tag>
           <Title>让 Agent 的执行<br />始终处于可控范围</Title>
           <Paragraph>集中处理 dsh-superagent 的调研提案、人工审批、持久化排期、执行回执与审计追踪。</Paragraph>
           <div className="login-principles">
