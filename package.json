@@ -4,6 +4,9 @@
   "private": true,
   "packageManager": "pnpm@12.5.1",
   "scripts": {
+    "prepare": "node scripts/install-git-hooks.mjs",
+    "hooks:install": "node scripts/install-git-hooks.mjs",
+    "commit:check": "node scripts/validate-commit-message.mjs --last",
     "dev": "concurrently -k -n server,web -c cyan,magenta \"pnpm --filter @gatehouse/server dev\" \"pnpm --filter @gatehouse/web dev\"",
     "dev:server": "pnpm --filter @gatehouse/server dev",
     "dev:web": "pnpm --filter @gatehouse/web dev",

@@ -44,11 +44,13 @@ pnpm dev
 ## 常用命令
 
 ```powershell
+pnpm hooks:install  # 安装本地 commit-msg 校验钩子
 pnpm test          # 契约 + 服务端 + Web 测试
 pnpm typecheck     # 全工作区类型检查
 pnpm build         # 服务端类型检查 + Web 生产构建
 pnpm seed          # 初始化演示数据库后退出
 pnpm browser:smoke # 使用本机 Chrome 做真实浏览器冒烟，需先启动 pnpm dev
+pnpm commit:check  # 校验当前 HEAD 的提交信息
 ```
 
 ## 核心实现
@@ -63,6 +65,18 @@ pnpm browser:smoke # 使用本机 Chrome 做真实浏览器冒烟，需先启动
 - 审计表 append-only，由 SQLite 触发器阻止更新和删除。
 
 详细文档见 [架构说明](docs/architecture.md)、[审批流程](docs/approval-flow.md)、[插件集成](docs/plugin-integration.md)、[数据模型](docs/data-model.md) 和 [验收清单](docs/acceptance-checklist.md)。
+
+## 协作与提交规范
+
+仓库的统一协作、架构边界、测试要求和安全规则见 [AGENTS.md](AGENTS.md)。所有提交必须使用 Conventional Commits：
+
+```text
+<type>(<scope>)!: <subject>
+```
+
+例如 `feat(web): add schedule conflict warning`、`fix(server): reject expired approval grant`、`docs: explain plugin retry policy`。允许的 type 包括 `feat`、`fix`、`refactor`、`perf`、`test`、`docs`、`style`、`build`、`ci`、`chore`、`revert` 和 `merge`；subject 使用祈使语气，不超过 72 个字符。
+
+执行 `pnpm hooks:install` 后，本地 `commit-msg` 钩子会拒绝不合规提交；GitHub Pull Request 的 `Commit message` workflow 会校验相对 base 分支的全部提交。hooks 由 `pnpm install` 的 `prepare` 自动安装。
 
 ## 与 dsh-superagent 联调
 
