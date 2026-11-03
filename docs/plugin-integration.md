@@ -104,6 +104,7 @@ POST /orchestrator/api/proposals/:proposal_id/decision
   "decision": "approve",
   "reviewer": "复核人",
   "comment": "范围明确，可以执行",
+  "grant_id": "grant_123",
   "requirement_hash": "sha256:...",
   "scope_hash": "sha256:...",
   "schedule_at": "2026-11-03T02:00:00.000Z",
@@ -119,6 +120,7 @@ dsh-superagent 必须校验：
 - proposal 当前状态。
 - 两个哈希与插件保存事实一致。
 - 排期与过期时间。
+- Gatehouse 生成的 `grant_id`；执行侧必须使用同一 canonical ID，不能自行生成第二枚 ID。
 - 幂等键；重复请求返回同一结果。
 
 ### 改期
@@ -156,6 +158,8 @@ POST /orchestrator/api/executions
 ```
 
 dsh-superagent 必须在创建 Ticket、启动 Worker、创建 worktree、写文件、提交或开 PR 之前原子校验并消费 Grant。没有有效 Grant 时所有执行副作用都必须被拒绝。
+
+执行同步进入 dead 后，Gatehouse 只能在 Grant 仍有效且存在同一 `execution_id` 的 dead outbox 时允许人工重试。重试必须复用原 `execution_id`，防止重复 Ticket 或交付。
 
 ## 回调与最终状态
 

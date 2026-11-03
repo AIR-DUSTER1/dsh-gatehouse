@@ -77,6 +77,9 @@ describe('console API', () => {
     });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ decision: { comment: '' }, detail: { decisions: [{ comment: '' }] } });
+    const grant = h.context.grants.getByProposal(fixture.proposal.id)!;
+    const decisionOutbox = h.context.db.prepare("SELECT payload_json FROM outbox_messages WHERE topic = 'plugin.decision' AND aggregate_id = ?").get(fixture.proposal.id) as { payload_json: string };
+    expect(JSON.parse(decisionOutbox.payload_json)).toMatchObject({ grant_id: grant.id });
   });
 
   it('requires reviewer or admin access to change a schedule', async () => {

@@ -63,7 +63,7 @@ describe('JSON schemas', () => {
     }
     expect(pluginDecisionRequestSchema.parse({
       proposal_id: 'proposal-1', decision: 'approve', reviewer: '演示复核人', requirement_hash: hash,
-      scope_hash: hash, schedule_at: '2026-11-03T02:00:00.000Z', expires_at: '2026-11-04T02:00:00.000Z',
+      grant_id: 'grant-1', scope_hash: hash, schedule_at: '2026-11-03T02:00:00.000Z', expires_at: '2026-11-04T02:00:00.000Z',
       trace_id: 'trace-1', idempotency_key: 'idem-1',
     }).comment).toBe('');
   });
@@ -86,7 +86,7 @@ describe('JSON schemas', () => {
     expect(pluginEventSchema.safeParse(event).success).toBe(true);
     expect(ajv.getSchema('https://dsh.local/schemas/plugin-event.schema.json')!(event)).toBe(true);
     expect(pluginDecisionRequestSchema.safeParse({
-      proposal_id: 'proposal-1', decision: 'approve', reviewer: '演示复核人', comment: '可以执行', requirement_hash: hash,
+      proposal_id: 'proposal-1', decision: 'approve', reviewer: '复核人', comment: '可以执行', grant_id: 'grant-1', requirement_hash: hash,
       scope_hash: hash, schedule_at: '2026-11-03T02:00:00.000Z',
       expires_at: '2026-11-04T02:00:00.000Z', trace_id: 'trace-1', idempotency_key: 'idem-1',
     }).success).toBe(true);

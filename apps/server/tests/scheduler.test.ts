@@ -108,6 +108,30 @@ describe('persistent scheduler', () => {
     expect(h.context.schedules.getByProposal(h.proposalId)).toMatchObject({ id: schedule.id, status: 'scheduled', schedule_at: renewedAt.toISOString() });
   });
 
+  it('retries a dead execution dispatch with the same execution id', async () => {
+    const h = await createHarness(); open.push(h);
+    const plugin = h.context.plugin as MockPluginClient;
+    plugin.failExecution = true;
+    const scheduleAt = new Date(Date.now() + 60 * 60_000);
+    expect((await decideApprove(h, { scheduleAt, expiresAt: new Date(Date.now() + 2 * 60 * 60_000) })).statusCode).toBe(200);
+    await h.context.scheduler.runOnce(new Date(scheduleAt.getTime() + 60_000));
+    await h.context.scheduler.runOnce(new Date(scheduleAt.getTime() + 63_000));
+    await h.context.scheduler.runOnce(new Date(scheduleAt.getTime() + 70_000));
+    const failed = h.context.schedules.getByProposal(h.proposalId)!;
+    expect(failed.status).toBe('failed');
+    expect(failed.execution_id).toBeTruthy();
+    expect(h.context.outbox.findDead('plugin.execute', h.proposalId)).toBeTruthy();
+    expect(h.context.query.listSchedules()[0]?.retryable).toBe(true);
+
+    plugin.failExecution = false;
+    const retried = await h.app.inject({ method: 'POST', url: `/api/schedule/${failed.id}/retry-execution`,
+      headers: { authorization: `Bearer ${h.reviewerToken}` } });
+    expect(retried.statusCode).toBe(200);
+    expect(h.context.schedules.getByProposal(h.proposalId)?.status).toBe('completed');
+    expect(h.context.schedules.getByProposal(h.proposalId)?.last_error).toBeNull();
+    expect(h.context.grants.getByProposal(h.proposalId)?.status).toBe('consumed');
+  });
+
   it('recovers a persisted schedule after a console restart', async () => {
     const temp = mkdtempSync(join(tmpdir(), 'gatehouse-test-'));
     const dbPath = join(temp, 'console.db');

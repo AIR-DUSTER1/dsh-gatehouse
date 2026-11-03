@@ -57,6 +57,7 @@ pnpm commit:check  # 校验当前 HEAD 的提交信息
 - 调度器每次从 SQLite 读取到期任务，支持重启恢复、暂停/恢复、改期、撤回与最大并发。
 - 改期会更新执行侧 Grant；撤回会吊销 Grant，并把需求退回待复核。
 - ApprovalGrant 一次性消费；需求或范围哈希变化会使旧批准失效。
+- Gatehouse 与执行侧共用同一 canonical Grant ID；执行同步失败时可安全复用原 execution_id 重试。
 - 审计表 append-only，由 SQLite 触发器阻止更新和删除。
 
 详细文档见 [架构说明](docs/architecture.md)、[审批流程](docs/approval-flow.md)、[插件集成](docs/plugin-integration.md)、[数据模型](docs/data-model.md) 和 [验收清单](docs/acceptance-checklist.md)。

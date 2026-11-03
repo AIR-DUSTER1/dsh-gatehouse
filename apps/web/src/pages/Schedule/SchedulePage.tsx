@@ -4,7 +4,7 @@ import {
   Alert, App as AntdApp, Button, Card, Col, DatePicker, Empty, Flex, Form, Input, Modal, Popconfirm, Row, Space, Statistic, Typography,
 } from 'antd';
 import type { ScheduleListItem } from '@gatehouse/contract';
-import { CalendarOutlined, ClockCircleOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons';
+import { CalendarOutlined, ClockCircleOutlined, ReloadOutlined, RetweetOutlined, WarningOutlined } from '@ant-design/icons';
 import dayjs, { type Dayjs } from 'dayjs';
 import { api, ApiError } from '../../api/client';
 import { useApiData } from '../../hooks/useApiData';
@@ -55,10 +55,20 @@ export function SchedulePage() {
   const act = async (item: ScheduleListItem, action: 'pause' | 'resume') => {
     setPendingId(item.id);
     try {
-      await api<ScheduleActionResponse>(`/api/schedule/${item.id}/${action}`, { method: 'POST' });
+      await api<ScheduleActionResponse>(`/api/schedule/${item.id}/${action}`, { method: 'POST', body: JSON.stringify({}) });
       message.success(action === 'pause' ? '排期已暂停' : '排期已恢复');
       reload();
     } catch (reason) { showFailure(reason, '操作失败'); }
+    finally { setPendingId(''); }
+  };
+
+  const retryExecution = async (item: ScheduleListItem) => {
+    setPendingId(item.id);
+    try {
+      await api<ScheduleActionResponse>(`/api/schedule/${item.id}/retry-execution`, { method: 'POST', body: JSON.stringify({}) });
+      message.success('已重新提交执行同步');
+      reload();
+    } catch (reason) { showFailure(reason, '重试执行失败'); }
     finally { setPendingId(''); }
   };
 
@@ -118,6 +128,8 @@ export function SchedulePage() {
                 {item.status === 'cancelled' ? `撤回原因：${item.last_error}` : item.last_error}
               </Text>}
               {item.pr_url && <a href={item.pr_url} target="_blank" rel="noreferrer">查看 Pull Request</a>}
+              {canControl && item.status === 'failed' && item.retryable && <Button size="small" icon={<RetweetOutlined />}
+                loading={pendingId === item.id} onClick={() => void retryExecution(item)}>重试执行同步</Button>}
               {canControl && ['scheduled', 'paused'].includes(item.status) && <Space wrap className="schedule-actions">
                 <Popconfirm title={item.status === 'paused' ? '恢复此排期？' : '暂停此排期？'} onConfirm={() => void act(item, item.status === 'paused' ? 'resume' : 'pause')}><Button size="small" loading={pendingId === item.id}>{item.status === 'paused' ? '恢复' : '暂停'}</Button></Popconfirm>
                 <Button size="small" onClick={() => setRescheduleItem(item)}>修改排期</Button>

@@ -93,6 +93,7 @@ export class ApprovalService {
     const nextStatus = input.decision.decision === 'approve'
       ? 'scheduled'
       : input.decision.decision === 'reject' ? 'rejected' : 'info_requested';
+    let approvedGrantId: string | undefined;
 
     transaction(this.db, () => {
       this.decisions.create({ ...decisionRecord, idempotency_key: input.idempotencyKey, request_hash: requestHash });
@@ -116,6 +117,7 @@ export class ApprovalService {
           requirement_hash: reviewCase.requirement_hash, scope_hash: proposal.scope_hash,
           approved_at: at, schedule_at: scheduleAt, expires_at: expiresAt, consumed_at: null, status: 'active',
         });
+        approvedGrantId = grant.id;
         this.schedules.activate({
           id: existingSchedule?.id ?? newId('schedule'), proposal_id: proposal.id, grant_id: grant.id,
           schedule_at: scheduleAt, expires_at: expiresAt, status: 'scheduled', approval_synced_at: null,
@@ -140,6 +142,7 @@ export class ApprovalService {
         decision: input.decision.decision,
         reviewer: input.user.name,
         comment: input.decision.comment,
+        ...(input.decision.decision === 'approve' && approvedGrantId ? { grant_id: approvedGrantId } : {}),
         requirement_hash: reviewCase.requirement_hash,
         scope_hash: proposal.scope_hash,
         ...(input.decision.decision === 'approve' ? { schedule_at: scheduleAt, expires_at: expiresAt } : {}),

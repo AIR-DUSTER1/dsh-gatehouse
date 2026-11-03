@@ -64,6 +64,18 @@ export class OutboxRepository {
     return row.count;
   }
 
+  findDead(topic: string, aggregateId: string): OutboxMessage | null {
+    const row = this.db.prepare(`SELECT * FROM outbox_messages WHERE topic = ? AND aggregate_id = ? AND status = 'dead'
+      ORDER BY created_at DESC LIMIT 1`).get(topic, aggregateId) as OutboxRow | undefined;
+    return row ? this.map(row) : null;
+  }
+
+  requeueDead(id: string, at: string): boolean {
+    const result = this.db.prepare(`UPDATE outbox_messages SET status = 'pending', attempts = 0, last_error = NULL,
+      next_attempt_at = ?, updated_at = ? WHERE id = ? AND status = 'dead'`).run(at, at, id);
+    return Number(result.changes) === 1;
+  }
+
   private map(row: OutboxRow): OutboxMessage {
     return {
       id: row.id, topic: row.topic, aggregateId: row.aggregate_id,
