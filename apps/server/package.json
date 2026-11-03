@@ -7,7 +7,6 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc --noEmit",
     "start": "tsx src/server.ts",
-    "seed": "tsx src/seed.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

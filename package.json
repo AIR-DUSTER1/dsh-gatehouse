@@ -13,7 +13,6 @@
     "build": "pnpm --filter @gatehouse/contract build && pnpm --filter @gatehouse/server build && pnpm --filter @gatehouse/web build",
     "test": "pnpm --filter @gatehouse/contract test && pnpm --filter @gatehouse/server test && pnpm --filter @gatehouse/web test",
     "typecheck": "pnpm --filter @gatehouse/contract typecheck && pnpm --filter @gatehouse/server typecheck && pnpm --filter @gatehouse/web typecheck",
-    "seed": "pnpm --filter @gatehouse/server seed",
     "start": "pnpm --filter @gatehouse/server start",
     "browser:smoke": "node scripts/browser-smoke.mjs"
   },

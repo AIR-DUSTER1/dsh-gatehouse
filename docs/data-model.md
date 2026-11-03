@@ -28,6 +28,8 @@
 - `consumed_at`
 - `status`: `active | consumed | revoked | expired`
 
+改期会更新 `schedule_at` / `expires_at`；撤回会置为 `revoked`。重新审批会复用同一 Proposal 的 Grant/Schedule 行并写入新的激活事实，避免伪造新的 Proposal。
+
 ### schedules
 
 持久化排期。`approval_synced_at` 表示审批事实已可靠发送给执行器。调度器只领取：
@@ -37,6 +39,8 @@ status = scheduled
 AND approval_synced_at IS NOT NULL
 AND schedule_at <= now
 ```
+
+改期会重置 `approval_synced_at`，直到新 Grant 同步成功；撤回将状态置为 `cancelled` 并吊销关联 Grant。
 
 ### audit_events
 

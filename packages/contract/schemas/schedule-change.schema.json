@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dsh.local/schemas/schedule-change.schema.json",
+  "title": "ScheduleChangeInput",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schedule_at", "expires_at"],
+  "properties": {
+    "schedule_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "timezone": { "type": "string", "minLength": 1, "default": "Asia/Shanghai" },
+    "reason": { "type": "string", "maxLength": 500, "default": "" }
+  }
+}

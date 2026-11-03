@@ -6,7 +6,8 @@ import type { GrantRepository } from '../repositories/grant-repository.js';
 import type { ProposalRepository } from '../repositories/proposal-repository.js';
 import type { ReviewRepository } from '../repositories/review-repository.js';
 import type { AuditService } from '../audit/audit-service.js';
-import type { PluginClient, PluginDecisionRequest, PluginExecuteRequest, PluginExecuteResponse } from '../plugin/plugin-client.js';
+import type { PluginClient, PluginDecisionRequest, PluginExecuteRequest, PluginExecuteResponse, PluginScheduleRequest,
+  PluginWithdrawRequest } from '../plugin/plugin-client.js';
 import { nowIso } from '../domain/utils.js';
 
 export interface DrainResult { delivered: number; retried: number; dead: number }
@@ -82,6 +83,14 @@ export class OutboxDispatcher {
       if (response.execution_id !== payload.execution_id) throw new Error(`plugin returned execution_id ${response.execution_id}, expected ${payload.execution_id}`)
       return { executionId: response.execution_id, ...(response.ticket_id ? { ticketId: response.ticket_id } : {}), prUrl: response.pr_url ?? null, completed: response.completed === true };
     }
+    if (message.topic === 'plugin.reschedule') {
+      await this.plugin.reschedule(message.payload as PluginScheduleRequest);
+      return {};
+    }
+    if (message.topic === 'plugin.withdraw') {
+      await this.plugin.withdraw(message.payload as PluginWithdrawRequest);
+      return {};
+    }
     throw new Error(`未知 outbox topic: ${message.topic}`);
   }
 
@@ -99,6 +108,23 @@ export class OutboxDispatcher {
           before: { approval_synced_at: null }, after: { approval_synced_at: at }, traceId: `outbox:${message.id}`, at,
         });
       }
+      return;
+    }
+    if (message.topic === 'plugin.reschedule') {
+      if (schedule) {
+        this.schedules.markApprovalSynced(proposal.id, at);
+        this.audit.record({
+          entityType: 'review_case', entityId: reviewCase.id, action: 'schedule.reschedule_synced', actor: 'system',
+          before: { approval_synced_at: null }, after: { approval_synced_at: at }, traceId: `outbox:${message.id}`, at,
+        });
+      }
+      return;
+    }
+    if (message.topic === 'plugin.withdraw') {
+      this.audit.record({
+        entityType: 'review_case', entityId: reviewCase.id, action: 'schedule.withdraw_synced', actor: 'system',
+        before: { grant_status: 'revoked' }, after: { synced: true }, traceId: `outbox:${message.id}`, at,
+      });
       return;
     }
     if (message.topic === 'plugin.execute' && schedule) {
@@ -128,6 +154,22 @@ export class OutboxDispatcher {
     const reviewCase = this.cases.get(proposal.review_case_id);
     if (!reviewCase) return;
     const schedule = this.schedules.getByProposal(proposal.id);
+    if (schedule && message.topic === 'plugin.reschedule') {
+      this.schedules.recordError(schedule.id, reason, at);
+      this.audit.record({
+        entityType: 'review_case', entityId: reviewCase.id, action: 'plugin.reschedule.failed', actor: 'system',
+        before: { approval_synced_at: null }, after: { reason, outbox_id: message.id }, traceId: `outbox:${message.id}`, at,
+      });
+      return;
+    }
+    if (message.topic === 'plugin.withdraw') {
+      if (schedule) this.schedules.recordError(schedule.id, reason, at);
+      this.audit.record({
+        entityType: 'review_case', entityId: reviewCase.id, action: 'plugin.withdraw.failed', actor: 'system',
+        before: { grant_status: 'revoked' }, after: { reason, outbox_id: message.id }, traceId: `outbox:${message.id}`, at,
+      });
+      return;
+    }
     if (schedule) {
       if (message.topic === 'plugin.decision') this.schedules.cancel(schedule.id, reason, at);
       else this.schedules.fail(schedule.id, reason, at);

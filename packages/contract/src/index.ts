@@ -279,6 +279,19 @@ export const decisionInputSchema = z.discriminatedUnion('decision', [
 ]);
 export type DecisionInput = z.infer<typeof decisionInputSchema>;
 
+export const scheduleChangeInputSchema = z.object({
+  schedule_at: isoDateSchema,
+  expires_at: isoDateSchema,
+  timezone: z.string().min(1).default('Asia/Shanghai'),
+  reason: z.string().trim().max(500).default(''),
+});
+export type ScheduleChangeInput = z.infer<typeof scheduleChangeInputSchema>;
+
+export const scheduleWithdrawInputSchema = z.object({
+  reason: z.string().trim().max(500).default(''),
+});
+export type ScheduleWithdrawInput = z.infer<typeof scheduleWithdrawInputSchema>;
+
 export const approvalGrantSchema = z.object({
   id: z.string().min(1),
   proposal_id: z.string().min(1),

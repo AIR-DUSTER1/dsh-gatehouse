@@ -12,11 +12,15 @@ info_requested
   └─ 新提案版本 → pending_review（旧版本 superseded）
 
 scheduled
-  ├─ pause → paused
+  ├─ pause     → paused
+  ├─ reschedule → scheduled（更新 Grant 的排期与过期时间）
+  ├─ withdraw  → cancelled（Grant revoked、需求回到 pending_review）
   └─ due   → executing
 
 paused
-  └─ resume → scheduled
+  ├─ resume → scheduled
+  ├─ reschedule → scheduled
+  └─ withdraw → cancelled
 
 executing
   ├─ execution.finished → completed
@@ -54,6 +58,14 @@ schedule_at <= now
 ```
 
 同一 `execution_id` 的重放必须由执行器返回同一结果，不得创建第二个 Worker 或 PR。
+
+## 改期与撤回
+
+只有 `scheduled` / `paused` 且 Grant 为 `active`、尚未开始执行时允许改期或撤回。
+
+改期在同一数据库事务内更新 Grant 与 Schedule，清空 `approval_synced_at`，再通过 transactional outbox 将新排期同步给执行侧。同步完成前调度器不会领取该任务。
+
+撤回会吊销 Grant、取消 Schedule、把需求与提案恢复为 `pending_review`，并异步通知执行侧吊销旧 Grant。撤回后可再次审批；旧 Grant 与旧 Schedule 行会以新审批内容重新激活，审计记录保留完整前后状态。
 
 ## 失败路径
 
