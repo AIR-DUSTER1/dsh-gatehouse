@@ -78,9 +78,9 @@ pnpm browser:smoke # 使用本机 Chrome 做真实浏览器冒烟，需先启动
 
 - **Gatehouse**（当前仓库）：人工复核、审批、排期、执行投影与审计控制台。  
   `https://github.com/AIR-DUSTER1/dsh-gatehouse`
-- **DSH Forge**：与 Gatehouse 配套的执行侧独立发行版，负责需求评估、Proposal、Grant 校验、Worker 执行与 PR 交付。  
-  `https://github.com/AIR-DUSTER1/dsh-forge`
+- **DSH Superagent Review**：与 Gatehouse 配套的执行侧独立发行版，负责需求评估、Proposal、Grant 校验、Worker 执行与 PR 交付。  
+  `https://github.com/AIR-DUSTER1/dsh-superagent-review`
 
-DSH Forge 来源于开源项目 **dsh-superagent**：  
+DSH Superagent Review 来源于开源项目 **dsh-superagent**：  
 [https://github.com/deepseek-ai/dsh-superagent-prototype](https://github.com/deepseek-ai/dsh-superagent-prototype)
 
