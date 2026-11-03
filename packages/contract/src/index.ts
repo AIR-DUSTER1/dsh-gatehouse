@@ -260,7 +260,7 @@ export const pluginEventSchema = z.object({
 export const decisionInputSchema = z.discriminatedUnion('decision', [
   z.object({
     decision: z.literal('approve'),
-    comment: z.string().trim().min(2, '审批意见至少 2 个字符'),
+    comment: z.string().trim().max(2000, '审批意见不能超过 2000 个字符').default(''),
     schedule_at: isoDateSchema,
     expires_at: isoDateSchema,
     timezone: z.string().min(1).default('Asia/Shanghai'),
@@ -268,12 +268,12 @@ export const decisionInputSchema = z.discriminatedUnion('decision', [
   }),
   z.object({
     decision: z.literal('reject'),
-    comment: z.string().trim().min(2, '驳回原因至少 2 个字符'),
+    comment: z.string().trim().max(2000, '审批意见不能超过 2000 个字符').default(''),
     risk_confirmed: z.literal(true),
   }),
   z.object({
     decision: z.literal('request_info'),
-    comment: z.string().trim().min(2, '补充说明至少 2 个字符'),
+    comment: z.string().trim().max(2000, '审批意见不能超过 2000 个字符').default(''),
     risk_confirmed: z.literal(true),
   }),
 ]);
@@ -296,7 +296,7 @@ export const pluginDecisionRequestSchema = z.object({
   proposal_id: z.string().min(1),
   decision: z.enum(DECISIONS),
   reviewer: z.string().min(1),
-  comment: z.string().min(1),
+  comment: z.string().trim().max(2000).default(''),
   requirement_hash: hashSchema,
   scope_hash: hashSchema,
   schedule_at: isoDateSchema.optional(),
