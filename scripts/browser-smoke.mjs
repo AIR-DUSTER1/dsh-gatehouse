@@ -4,6 +4,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 const chromePath = process.env.BROWSER_PATH ?? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const email = process.env.BROWSER_TEST_EMAIL;
 const password = process.env.BROWSER_TEST_PASSWORD;
+const expectedRepository = process.env.BROWSER_EXPECTED_REPOSITORY;
 if (!email || !password) throw new Error('Set BROWSER_TEST_EMAIL and BROWSER_TEST_PASSWORD for the browser smoke test.');
 
 mkdirSync('.run/screens', { recursive: true });
@@ -27,6 +28,10 @@ try {
   await page.getByRole('button', { name: '进入控制台' }).click();
   await page.waitForURL('http://127.0.0.1:5173/', { timeout: 15000 });
   await page.getByRole('heading', { name: /早上好|下午好|晚上好/ }).waitFor();
+  if (expectedRepository) {
+    const workspace = await page.locator('.workspace-repository-name').innerText();
+    assert(workspace.replace(/\s+/g, '') === expectedRepository.replace(/\s+/g, ''), '侧栏当前工作区未显示监听仓库');
+  }
   await page.screenshot({ path: '.run/screens/01-dashboard.png', fullPage: true });
 
   for (const [path, heading] of [['/review', '复核中心'], ['/schedule', '执行调度'], ['/executions', '交付记录'], ['/audit', '审计日志'], ['/settings', '系统设置']]) {

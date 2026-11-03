@@ -5,8 +5,10 @@ import {
   AuditOutlined, BellOutlined, CalendarOutlined, ControlOutlined, DashboardOutlined, DownOutlined,
   LogoutOutlined, MenuOutlined, RocketOutlined, SafetyCertificateOutlined, SettingOutlined,
 } from '@ant-design/icons';
+import { useApiData } from '../hooks/useApiData';
 import { useAuth } from '../hooks/useAuth';
 import { roleLabels } from '../lib/format';
+import type { SettingsResponse } from '../types/api';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -63,6 +65,10 @@ export function AppShell() {
   const location = useLocation();
   const screens = Grid.useBreakpoint();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { data: workspaceSettings, loading: workspaceLoading } = useApiData<SettingsResponse>('/api/settings');
+  const repositoryParts = workspaceSettings?.monitored_repository?.split('/');
+  const repositoryOwner = repositoryParts?.[0] ?? '';
+  const repositoryName = repositoryParts?.slice(1).join('/') ?? '';
   const routeInfo = location.pathname.startsWith('/review/')
     ? { title: '需求详情', section: '人工决策' }
     : titles[location.pathname] ?? { title: '复核中心', section: 'Gatehouse' };
@@ -83,7 +89,19 @@ export function AppShell() {
       </Flex>
       <div className="workspace-card">
         <Text className="workspace-label">当前工作区</Text>
-        <Flex align="center" gap={8}><span className="workspace-mark">DS</span><span>dsh-superagent</span><DownOutlined /></Flex>
+        <Flex align="flex-start" gap={8} className="workspace-repository" title={workspaceSettings?.monitored_repository ?? undefined}>
+          <span className="workspace-mark">GH</span>
+          <span className="workspace-repository-name">
+            {workspaceSettings?.monitored_repository ? (
+              <>
+                <span>{repositoryOwner}/</span><strong>{repositoryName}</strong>
+              </>
+            ) : (
+              <span className="workspace-repository-empty">{workspaceLoading ? '正在读取监听仓库…' : '未配置监听仓库'}</span>
+            )}
+          </span>
+          <DownOutlined />
+        </Flex>
       </div>
       <Text className="nav-caption">管理</Text>
       <Navigation onNavigate={() => setDrawerOpen(false)} />

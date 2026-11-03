@@ -155,6 +155,11 @@ describe('console API', () => {
     });
     expect(admin.statusCode).toBe(200);
     expect(h.context.settings.get('max_concurrency')).toBe('3');
+    const settings = await h.app.inject({
+      method: 'GET', url: '/api/settings', headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(settings.statusCode).toBe(200);
+    expect(settings.json()).toMatchObject({ max_concurrency: 3, monitored_repository: null });
   });
 
   it('invalidates an active approval when proposal scope changes', async () => {

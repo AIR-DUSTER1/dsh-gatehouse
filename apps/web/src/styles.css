@@ -249,6 +249,12 @@ code, .ant-typography code {
   font-weight: 600;
   border-radius: 0;
 }
+.workspace-repository { min-width: 0; align-items: flex-start; }
+.workspace-repository .workspace-mark { flex: 0 0 20px; margin-top: 1px; }
+.workspace-repository-name { display: flex; flex: 1; min-width: 0; flex-direction: column; line-height: 1.35; }
+.workspace-repository-name span { color: #7f796e; font-family: var(--font-mono); font-size: 8.5px; overflow-wrap: anywhere; }
+.workspace-repository-name strong { color: #f2eee4; font-family: var(--font-mono); font-size: 10px; font-weight: 600; overflow-wrap: anywhere; }
+.workspace-repository-empty { color: #a9a399 !important; font-family: var(--font-sans) !important; font-size: 11px !important; }
 .workspace-card .anticon-down { margin-left: auto; color: #6e695f; font-size: 10px; }
 
 .nav-caption {
