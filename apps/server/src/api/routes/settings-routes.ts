@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { AppContext } from '../../app.js';
 import { requestUser, requireRole } from '../../auth.js';
 import { traceId } from '../request-context.js';
+import { readMonitoredRepository } from '../../plugin/workspace-repository.js';
 
 const settingsSchema = z.object({ max_concurrency: z.number().int().min(1).max(20) });
 
@@ -10,10 +11,14 @@ export async function registerSettingsRoutes(app: FastifyInstance, context: AppC
   app.get('/api/settings', async (request) => {
     requestUser(request, context.config.sessionSecret);
     const maxConcurrency = Number.parseInt(context.settings.get('max_concurrency') ?? '', 10) || context.config.scheduleMaxConcurrency;
+    const monitoredRepository = context.config.pluginMode === 'http'
+      ? await readMonitoredRepository(context.config.pluginBaseUrl, context.config.pluginTimeoutMs)
+      : null;
     return {
       max_concurrency: maxConcurrency,
       plugin_mode: context.config.pluginMode,
       plugin_base_url: context.config.pluginMode === 'http' ? context.config.pluginBaseUrl : '本地 mock adapter',
+      monitored_repository: monitoredRepository,
       session_ttl_seconds: context.config.sessionTtlSeconds,
       users: context.users.list(),
       pending_outbox: context.outbox.pendingCount(),

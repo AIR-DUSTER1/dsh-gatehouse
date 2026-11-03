@@ -222,7 +222,21 @@ paths:
     get:
       summary: 系统配置与成员
       responses:
-        '200': { description: 脱敏配置 }
+        '200':
+          description: 脱敏配置；监听仓库来自 DSH GitHub Source
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [max_concurrency, plugin_mode, plugin_base_url, monitored_repository, session_ttl_seconds, users, pending_outbox]
+                properties:
+                  max_concurrency: { type: integer }
+                  plugin_mode: { type: string, enum: [mock, http] }
+                  plugin_base_url: { type: string }
+                  monitored_repository: { type: string, nullable: true, example: AIR-DUSTER1/dsh-superagent-review }
+                  session_ttl_seconds: { type: integer }
+                  users: { type: array, items: { type: object } }
+                  pending_outbox: { type: integer }
     put:
       summary: 修改调度并发（admin）
       requestBody:

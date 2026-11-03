@@ -48,6 +48,7 @@ export function SettingsPage() {
           <Card variant="borderless" title={<Space><ApiOutlined />dsh-superagent 连接</Space>} extra={<Tag color="green">已连接</Tag>}>
             <Descriptions column={1} size="small" items={[
               { key: 'mode', label: '连接模式', children: <Text code>{data.plugin_mode === 'mock' ? 'mock adapter（本地演示）' : 'HTTP + HMAC'}</Text> },
+              { key: 'repository', label: '监听仓库', children: data.monitored_repository ? <Text code>{data.monitored_repository}</Text> : <Text type="secondary">未配置</Text> },
               { key: 'url', label: '执行器地址', children: <Text code>{data.plugin_base_url}</Text> },
               { key: 'outbox', label: '待重试消息', children: `${data.pending_outbox} 条` },
               { key: 'auth', label: '认证方式', children: 'HMAC-SHA256 · timestamp · nonce' },

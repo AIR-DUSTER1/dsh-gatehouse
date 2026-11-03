@@ -15,7 +15,7 @@ export interface ScheduleResponse {
 export interface AuditResponse { items: AuditEventRecord[]; total: number; page: number; page_size: number }
 export interface SettingsResponse {
   max_concurrency: number; plugin_mode: 'mock' | 'http'; plugin_base_url: string;
-  session_ttl_seconds: number; users: User[]; pending_outbox: number;
+  monitored_repository: string | null; session_ttl_seconds: number; users: User[]; pending_outbox: number;
 }
 export interface DecisionResponse {
   replayed: boolean; decision: { id: string; decision: string; reviewer: string; comment: string; created_at: string };
