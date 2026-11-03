@@ -25,6 +25,23 @@ export class ScheduleRepository {
       input.execution_id, input.pr_url, input.created_at, input.updated_at);
   }
 
+  /** Create or reset the Proposal's schedule, including reapproval after withdrawal. */
+  activate(input: ScheduleRecord): ScheduleRecord {
+    const existing = this.getByProposal(input.proposal_id);
+    if (!existing) {
+      this.create(input);
+      return input;
+    }
+    this.db.prepare(`
+      UPDATE schedules SET grant_id = ?, schedule_at = ?, expires_at = ?, status = 'scheduled',
+        approval_synced_at = NULL, attempts = 0, max_attempts = ?, last_error = NULL,
+        execution_id = NULL, pr_url = NULL, updated_at = ?
+      WHERE id = ?
+    `).run(input.grant_id, input.schedule_at, input.expires_at, input.max_attempts, input.updated_at, existing.id);
+    return { ...input, id: existing.id, created_at: existing.created_at, status: 'scheduled',
+      approval_synced_at: null, attempts: 0, last_error: null, execution_id: null, pr_url: null };
+  }
+
   get(id: string): ScheduleRecord | null {
     const row = this.db.prepare('SELECT * FROM schedules WHERE id = ?').get(id) as ScheduleRow | undefined;
     return row ? { ...row } : null;
@@ -64,6 +81,14 @@ export class ScheduleRepository {
   markApprovalSynced(proposalId: string, at: string): void {
     this.db.prepare('UPDATE schedules SET approval_synced_at = ?, updated_at = ? WHERE proposal_id = ? AND approval_synced_at IS NULL')
       .run(at, at, proposalId);
+  }
+
+  reschedule(id: string, scheduleAt: string, expiresAt: string, at: string): void {
+    this.db.prepare(`
+      UPDATE schedules SET schedule_at = ?, expires_at = ?, status = 'scheduled', approval_synced_at = NULL,
+        attempts = 0, last_error = NULL, updated_at = ?
+      WHERE id = ?
+    `).run(scheduleAt, expiresAt, at, id);
   }
 
   markExecuting(id: string, executionId: string, at: string): void {

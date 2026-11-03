@@ -102,7 +102,7 @@ POST /orchestrator/api/proposals/:proposal_id/decision
 {
   "proposal_id": "proposal_8831_v1",
   "decision": "approve",
-  "reviewer": "演示复核人",
+  "reviewer": "复核人",
   "comment": "范围明确，可以执行",
   "requirement_hash": "sha256:...",
   "scope_hash": "sha256:...",
@@ -120,6 +120,22 @@ dsh-superagent 必须校验：
 - 两个哈希与插件保存事实一致。
 - 排期与过期时间。
 - 幂等键；重复请求返回同一结果。
+
+### 改期
+
+```http
+POST /orchestrator/api/proposals/:proposal_id/reschedule
+```
+
+请求包含 `proposal_id`、`grant_id`、两个哈希、新的 `schedule_at` / `expires_at`、`trace_id` 与 `idempotency_key`。执行侧只有在该 Grant 仍为 active、未消费且哈希一致时才能更新；重复的旧幂等键只能返回历史结果，不能把新排期回滚。
+
+### 撤回
+
+```http
+POST /orchestrator/api/proposals/:proposal_id/withdraw
+```
+
+请求包含 `proposal_id`、`grant_id`、两个哈希、撤回原因、`trace_id` 与 `idempotency_key`。执行侧必须吊销 active Grant、把 Proposal 恢复为 `pending_review`，并拒绝旧 Grant 的后续执行请求。
 
 ### 到期执行
 

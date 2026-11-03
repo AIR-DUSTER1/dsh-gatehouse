@@ -19,6 +19,22 @@ export class GrantRepository {
       input.approved_at, input.schedule_at, input.expires_at, input.consumed_at, input.status);
   }
 
+  /** Create a Grant or reactivate the Proposal's existing Grant after withdrawal. */
+  activate(input: ApprovalGrantRecord): ApprovalGrantRecord {
+    const existing = this.getByProposal(input.proposal_id);
+    if (!existing) {
+      this.create(input);
+      return input;
+    }
+    this.db.prepare(`
+      UPDATE approval_grants SET reviewer = ?, requirement_hash = ?, scope_hash = ?, approved_at = ?,
+        schedule_at = ?, expires_at = ?, consumed_at = NULL, status = 'active'
+      WHERE id = ?
+    `).run(input.reviewer, input.requirement_hash, input.scope_hash, input.approved_at,
+      input.schedule_at, input.expires_at, existing.id);
+    return { ...input, id: existing.id, consumed_at: null, status: 'active' };
+  }
+
   getByProposal(proposalId: string): ApprovalGrantRecord | null {
     const row = this.db.prepare('SELECT * FROM approval_grants WHERE proposal_id = ?').get(proposalId) as GrantRow | undefined;
     return row ? { ...row } : null;
@@ -39,6 +55,14 @@ export class GrantRepository {
 
   revoke(id: string): boolean {
     const result = this.db.prepare("UPDATE approval_grants SET status = 'revoked' WHERE id = ? AND status = 'active'").run(id);
+    return Number(result.changes) === 1;
+  }
+
+  reschedule(id: string, scheduleAt: string, expiresAt: string): boolean {
+    const result = this.db.prepare(`
+      UPDATE approval_grants SET schedule_at = ?, expires_at = ?
+      WHERE id = ? AND status = 'active' AND consumed_at IS NULL
+    `).run(scheduleAt, expiresAt, id);
     return Number(result.changes) === 1;
   }
 

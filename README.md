@@ -23,6 +23,7 @@
 ```powershell
 pnpm install
 Copy-Item .env.example .env
+# 修改 .env 中的三个 BOOTSTRAP_ADMIN_* 变量
 pnpm dev
 ```
 
@@ -31,15 +32,9 @@ pnpm dev
 - 健康检查：http://127.0.0.1:8787/health
 - 就绪检查：http://127.0.0.1:8787/ready
 
-首次启动会自动写入演示数据。演示账号统一密码 `demo123`：
+空数据库首次启动时只创建 `.env` 中显式配置的初始管理员，不写入任何需求、提案、排期或演示账号。管理员密码至少 12 位；后续账号接入外部的成员管理流程。
 
-| 账号 | 角色 |
-| --- | --- |
-| li@example.com | reviewer |
-| zhao@example.com | admin |
-| wang@example.com | viewer |
-
-`PLUGIN_MODE=mock` 时使用本地执行器适配器，便于完整演示审批、排期和执行回执。接入真实 `dsh-superagent` 时改为 `PLUGIN_MODE=http` 并配置共享密钥与地址。
+`PLUGIN_MODE=mock` 仅用于自动化测试和本地开发，会产生模拟执行结果。生产环境必须使用 `PLUGIN_MODE=http` 并配置 `dsh-superagent` 地址与共享密钥。
 
 ## 常用命令
 
@@ -48,8 +43,7 @@ pnpm hooks:install  # 安装本地 commit-msg 校验钩子
 pnpm test          # 契约 + 服务端 + Web 测试
 pnpm typecheck     # 全工作区类型检查
 pnpm build         # 服务端类型检查 + Web 生产构建
-pnpm seed          # 初始化演示数据库后退出
-pnpm browser:smoke # 使用本机 Chrome 做真实浏览器冒烟，需先启动 pnpm dev
+pnpm browser:smoke # 需先启动 pnpm dev，并设置 BROWSER_TEST_EMAIL / BROWSER_TEST_PASSWORD
 pnpm commit:check  # 校验当前 HEAD 的提交信息
 ```
 
@@ -60,7 +54,8 @@ pnpm commit:check  # 校验当前 HEAD 的提交信息
 - SQLite 持久化，仓库层集中 SQL。
 - HMAC-SHA256 插件事件签名、时间戳窗口和 nonce 防重放。
 - 审批决策与插件调用通过 transactional outbox 解耦。
-- 调度器每次从 SQLite 读取到期任务，支持重启恢复、暂停/恢复与最大并发。
+- 调度器每次从 SQLite 读取到期任务，支持重启恢复、暂停/恢复、改期、撤回与最大并发。
+- 改期会更新执行侧 Grant；撤回会吊销 Grant，并把需求退回待复核。
 - ApprovalGrant 一次性消费；需求或范围哈希变化会使旧批准失效。
 - 审计表 append-only，由 SQLite 触发器阻止更新和删除。
 

@@ -50,6 +50,20 @@ components:
             decision: { enum: [reject, request_info] }
             comment: { type: string, maxLength: 2000, default: '' }
             risk_confirmed: { const: true }
+    ScheduleChangeInput:
+      type: object
+      additionalProperties: false
+      required: [schedule_at, expires_at]
+      properties:
+        schedule_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+        timezone: { type: string, default: Asia/Shanghai }
+        reason: { type: string, maxLength: 500, default: '' }
+    ScheduleWithdrawInput:
+      type: object
+      additionalProperties: false
+      properties:
+        reason: { type: string, maxLength: 500, default: '' }
 paths:
   /health:
     get:
@@ -167,6 +181,32 @@ paths:
       responses:
         '200': { description: 已恢复 }
         '409': { description: 已过期或状态不允许 }
+  /api/schedule/{id}/reschedule:
+    post:
+      summary: 修改开发排期并重新同步授权
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ScheduleChangeInput' }
+      responses:
+        '200': { description: 已修改并重新同步 }
+        '403': { description: 无权限 }
+        '409': { description: 已开始执行或授权失效 }
+  /api/schedule/{id}/withdraw:
+    post:
+      summary: 撤回排期、吊销 Grant 并回到待复核
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ScheduleWithdrawInput' }
+      responses:
+        '200': { description: 已撤回 }
+        '403': { description: 无权限 }
+        '409': { description: 已开始执行或授权失效 }
   /api/audit:
     get:
       summary: 审计查询

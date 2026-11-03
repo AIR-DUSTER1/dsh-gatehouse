@@ -9,6 +9,8 @@ import {
   pluginDecisionRequestSchema,
   pluginEventSchema,
   proposalInputSchema,
+  scheduleChangeInputSchema,
+  scheduleWithdrawInputSchema,
 } from '../src/index.js';
 
 const schemaDir = fileURLToPath(new URL('../schemas/', import.meta.url));
@@ -64,6 +66,16 @@ describe('JSON schemas', () => {
       scope_hash: hash, schedule_at: '2026-11-03T02:00:00.000Z', expires_at: '2026-11-04T02:00:00.000Z',
       trace_id: 'trace-1', idempotency_key: 'idem-1',
     }).comment).toBe('');
+  });
+
+  it('validates schedule changes and withdrawals with both contract formats', () => {
+    const change = { schedule_at: '2026-11-03T10:00:00.000Z', expires_at: '2026-11-03T12:00:00.000Z',
+      timezone: 'Asia/Shanghai', reason: '调整开发窗口' };
+    expect(scheduleChangeInputSchema.safeParse(change).success).toBe(true);
+    expect(ajv.getSchema('https://dsh.local/schemas/schedule-change.schema.json')!(change)).toBe(true);
+    const withdraw = { reason: '重新评估范围' };
+    expect(scheduleWithdrawInputSchema.safeParse(withdraw).success).toBe(true);
+    expect(ajv.getSchema('https://dsh.local/schemas/schedule-withdraw.schema.json')!(withdraw)).toBe(true);
   });
 
   it('validates the plugin event envelope and decision command', () => {

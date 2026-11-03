@@ -66,7 +66,8 @@
 5. 排期从 SQLite 读取，不依赖内存定时器。
 6. 插件消费 Grant 必须原子化并保证一次性。
 7. Server `/health` 与 `/ready` 独立反映控制面状态和待投递数量。
-8. 调度器按 `SCHEDULE_MAX_CONCURRENCY` 或系统设置限制并发。
+8. 待执行排期支持暂停、恢复、改期和撤回；改期会重新同步 Grant，撤回会吊销 Grant 并回到待复核。
+9. 调度器按 `SCHEDULE_MAX_CONCURRENCY` 或系统设置限制并发。
 
 ## 4. 数据一致性
 

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dsh.local/schemas/schedule-withdraw.schema.json",
+  "title": "ScheduleWithdrawInput",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "reason": { "type": "string", "maxLength": 500, "default": "" }
+  }
+}

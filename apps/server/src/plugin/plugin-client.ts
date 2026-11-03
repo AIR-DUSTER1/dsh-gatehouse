@@ -31,8 +31,31 @@ export interface PluginExecuteResponse {
   completed?: boolean;
 }
 
+export interface PluginScheduleRequest {
+  proposal_id: string;
+  grant_id: string;
+  requirement_hash: string;
+  scope_hash: string;
+  schedule_at: string;
+  expires_at: string;
+  trace_id: string;
+  idempotency_key: string;
+}
+
+export interface PluginWithdrawRequest {
+  proposal_id: string;
+  grant_id: string;
+  requirement_hash: string;
+  scope_hash: string;
+  reason: string;
+  trace_id: string;
+  idempotency_key: string;
+}
+
 export interface PluginClient {
   decide(payload: PluginDecisionRequest): Promise<void>;
+  reschedule(payload: PluginScheduleRequest): Promise<void>;
+  withdraw(payload: PluginWithdrawRequest): Promise<void>;
   execute(payload: PluginExecuteRequest): Promise<PluginExecuteResponse>;
 }
 
@@ -46,6 +69,14 @@ export class HttpPluginClient implements PluginClient {
 
   async decide(payload: PluginDecisionRequest): Promise<void> {
     await this.post(`/orchestrator/api/proposals/${encodeURIComponent(payload.proposal_id)}/decision`, payload);
+  }
+
+  async reschedule(payload: PluginScheduleRequest): Promise<void> {
+    await this.post(`/orchestrator/api/proposals/${encodeURIComponent(payload.proposal_id)}/reschedule`, payload);
+  }
+
+  async withdraw(payload: PluginWithdrawRequest): Promise<void> {
+    await this.post(`/orchestrator/api/proposals/${encodeURIComponent(payload.proposal_id)}/withdraw`, payload);
   }
 
   async execute(payload: PluginExecuteRequest): Promise<PluginExecuteResponse> {
@@ -80,6 +111,8 @@ export class HttpPluginClient implements PluginClient {
 /** Deterministic local adapter used by first-run demo and automated tests. */
 export class MockPluginClient implements PluginClient {
   private readonly decisions = new Map<string, Promise<void>>();
+  private readonly scheduleChanges = new Map<string, Promise<void>>();
+  private readonly withdrawals = new Map<string, Promise<void>>();
   private readonly executions = new Map<string, PluginExecuteResponse>();
   public executionCalls = 0;
   public failExecution = false;
@@ -89,6 +122,22 @@ export class MockPluginClient implements PluginClient {
     if (existing) return existing;
     const promise = Promise.resolve();
     this.decisions.set(payload.idempotency_key, promise);
+    return promise;
+  }
+
+  async reschedule(payload: PluginScheduleRequest): Promise<void> {
+    const existing = this.scheduleChanges.get(payload.idempotency_key);
+    if (existing) return existing;
+    const promise = Promise.resolve();
+    this.scheduleChanges.set(payload.idempotency_key, promise);
+    return promise;
+  }
+
+  async withdraw(payload: PluginWithdrawRequest): Promise<void> {
+    const existing = this.withdrawals.get(payload.idempotency_key);
+    if (existing) return existing;
+    const promise = Promise.resolve();
+    this.withdrawals.set(payload.idempotency_key, promise);
     return promise;
   }
 

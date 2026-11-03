@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { AppContext } from '../../app.js';
 import { requestUser } from '../../auth.js';
 import { traceId } from '../request-context.js';
+import { scheduleChangeInputSchema, scheduleWithdrawInputSchema } from '@gatehouse/contract';
 
 export async function registerScheduleRoutes(app: FastifyInstance, context: AppContext): Promise<void> {
   app.get('/api/schedule', async (request) => {
@@ -34,6 +35,26 @@ export async function registerScheduleRoutes(app: FastifyInstance, context: AppC
     const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
     const trace = traceId(request);
     context.scheduleControl.resume(id, user, trace);
+    return { schedule: context.schedules.get(id), trace_id: trace };
+  });
+
+  app.post('/api/schedule/:id/reschedule', async (request) => {
+    const user = requestUser(request, context.config.sessionSecret);
+    const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
+    const input = scheduleChangeInputSchema.parse(request.body);
+    const trace = traceId(request);
+    context.scheduleControl.reschedule(id, input, user, trace);
+    await context.dispatcher.drain();
+    return { schedule: context.schedules.get(id), trace_id: trace };
+  });
+
+  app.post('/api/schedule/:id/withdraw', async (request) => {
+    const user = requestUser(request, context.config.sessionSecret);
+    const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
+    const input = scheduleWithdrawInputSchema.parse(request.body);
+    const trace = traceId(request);
+    context.scheduleControl.withdraw(id, input, user, trace);
+    await context.dispatcher.drain();
     return { schedule: context.schedules.get(id), trace_id: trace };
   });
 }

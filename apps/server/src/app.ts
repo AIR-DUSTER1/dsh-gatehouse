@@ -23,7 +23,7 @@ import { HttpPluginClient, MockPluginClient, type PluginClient } from './plugin/
 import { OutboxDispatcher } from './schedule/outbox-dispatcher.js';
 import { SchedulerService } from './schedule/scheduler-service.js';
 import { ScheduleControlService } from './schedule/schedule-control-service.js';
-import { seedDemoData } from './seed-data.js';
+import { ensureBootstrapAdmin } from './domain/bootstrap-admin.js';
 import { DomainError } from './domain/errors.js';
 import { registerAuthRoutes } from './api/routes/auth-routes.js';
 import { registerReviewRoutes } from './api/routes/review-routes.js';
@@ -86,14 +86,14 @@ export function createContext(config: AppConfig, pluginOverride?: PluginClient):
   const plugin = pluginOverride ?? (config.pluginMode === 'http'
     ? new HttpPluginClient(config.pluginBaseUrl, config.pluginSharedSecret, config.pluginTimeoutMs)
     : new MockPluginClient());
-  if (config.demoSeed) seedDemoData({ db, cases, proposals, decisions, grants, schedules, users, settings, audit });
+  ensureBootstrapAdmin(users, config);
   const approval = new ApprovalService(db, cases, proposals, decisions, grants, schedules, outbox, audit, config.pluginMaxAttempts);
   const query = new ReviewQueryService(cases, proposals, decisions, grants, schedules, auditRepository, analytics);
   const eventIngest = new PluginEventService(db, pluginEvents, cases, proposals, grants, schedules, audit);
   const dispatcher = new OutboxDispatcher(db, outbox, schedules, grants, proposals, cases, audit, plugin);
   const scheduler = new SchedulerService(db, schedules, grants, proposals, cases, outbox, settings, audit,
     dispatcher, config.schedulePollMs, config.scheduleMaxConcurrency, config.pluginMaxAttempts);
-  const scheduleControl = new ScheduleControlService(schedules, proposals, cases, audit);
+  const scheduleControl = new ScheduleControlService(db, schedules, grants, proposals, cases, outbox, audit, config.pluginMaxAttempts);
   return {
     config, db, cases, proposals, decisions, grants, schedules, auditRepository, outbox, pluginEvents,
     settings, users, analytics, audit, approval, query, eventIngest, plugin, dispatcher, scheduler, scheduleControl,

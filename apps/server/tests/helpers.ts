@@ -22,8 +22,10 @@ export async function createHarness(databasePath = ':memory:'): Promise<TestHarn
   const { app, context } = await createApplication({
     config: {
       databasePath,
-      demoSeed: false,
       pluginMode: 'mock',
+      bootstrapAdminEmail: 'admin@test.local',
+      bootstrapAdminName: '管理员',
+      bootstrapAdminPassword: 'test-admin-password-123',
       sessionSecret: 'test-session-secret-with-enough-length',
       pluginEventSecret: 'test-event-secret-with-enough-length',
       pluginSharedSecret: 'test-plugin-secret-with-enough-length',
@@ -36,7 +38,6 @@ export async function createHarness(databasePath = ':memory:'): Promise<TestHarn
   for (const user of [
     { id: 'user_reviewer', email: 'reviewer@test.local', name: '复核人甲', role: 'reviewer' as const, password: 'test123' },
     { id: 'user_viewer', email: 'viewer@test.local', name: '只读成员', role: 'viewer' as const, password: 'test123' },
-    { id: 'user_admin', email: 'admin@test.local', name: '管理员', role: 'admin' as const, password: 'test123' },
   ]) {
     context.users.create({ id: user.id, email: user.email, name: user.name, role: user.role, password_hash: hashPassword(user.password) });
   }

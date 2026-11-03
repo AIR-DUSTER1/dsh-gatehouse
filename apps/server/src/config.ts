@@ -19,7 +19,9 @@ export interface AppConfig {
   pluginTimeoutMs: number;
   pluginMaxAttempts: number;
   webOrigin: string;
-  demoSeed: boolean;
+  bootstrapAdminEmail: string;
+  bootstrapAdminName: string;
+  bootstrapAdminPassword: string;
   sessionTtlSeconds: number;
 }
 
@@ -46,7 +48,9 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     pluginTimeoutMs: integer('PLUGIN_TIMEOUT_MS', 5000),
     pluginMaxAttempts: integer('PLUGIN_MAX_ATTEMPTS', 5),
     webOrigin: process.env.WEB_ORIGIN ?? 'http://127.0.0.1:5173',
-    demoSeed: process.env.DEMO_SEED !== 'false',
+    bootstrapAdminEmail: process.env.BOOTSTRAP_ADMIN_EMAIL ?? '',
+    bootstrapAdminName: process.env.BOOTSTRAP_ADMIN_NAME ?? '',
+    bootstrapAdminPassword: process.env.BOOTSTRAP_ADMIN_PASSWORD ?? '',
     sessionTtlSeconds: integer('SESSION_TTL_SECONDS', 8 * 60 * 60),
     ...overrides,
   };

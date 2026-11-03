@@ -105,26 +105,33 @@ export class ApprovalService {
       });
 
       if (input.decision.decision === 'approve') {
-        const grantId = newId('grant');
-        this.grants.create({
+        const existingGrant = this.grants.getByProposal(proposal.id);
+        if (existingGrant?.status === 'active' && !existingGrant.consumed_at) {
+          throw new DomainError('APPROVAL_GRANT_ACTIVE', '该提案已有有效授权', '刷新详情后撤回旧排期或执行当前授权', 409);
+        }
+        const existingSchedule = this.schedules.getByProposal(proposal.id);
+        const grantId = existingGrant?.id ?? newId('grant');
+        const grant = this.grants.activate({
           id: grantId, proposal_id: proposal.id, reviewer: input.user.name,
           requirement_hash: reviewCase.requirement_hash, scope_hash: proposal.scope_hash,
           approved_at: at, schedule_at: scheduleAt, expires_at: expiresAt, consumed_at: null, status: 'active',
         });
-        this.schedules.create({
-          id: newId('schedule'), proposal_id: proposal.id, grant_id: grantId,
+        this.schedules.activate({
+          id: existingSchedule?.id ?? newId('schedule'), proposal_id: proposal.id, grant_id: grant.id,
           schedule_at: scheduleAt, expires_at: expiresAt, status: 'scheduled', approval_synced_at: null,
           attempts: 0, max_attempts: this.pluginMaxAttempts, last_error: null, execution_id: null, pr_url: null,
-          created_at: at, updated_at: at,
+          created_at: existingSchedule?.created_at ?? at, updated_at: at,
         });
         this.audit.record({
-          entityType: 'review_case', entityId: reviewCase.id, action: 'grant.created', actor: input.user.name,
-          before: null, after: { grant_id: grantId, schedule_at: scheduleAt, expires_at: expiresAt },
+          entityType: 'review_case', entityId: reviewCase.id, action: existingGrant ? 'grant.reactivated' : 'grant.created', actor: input.user.name,
+          before: existingGrant ? { status: existingGrant.status } : null,
+          after: { grant_id: grant.id, schedule_at: scheduleAt, expires_at: expiresAt },
           traceId: input.traceId, at,
         });
         this.audit.record({
-          entityType: 'review_case', entityId: reviewCase.id, action: 'schedule.created', actor: input.user.name,
-          before: null, after: { schedule_at: scheduleAt, status: 'scheduled' }, traceId: input.traceId, at,
+          entityType: 'review_case', entityId: reviewCase.id, action: existingSchedule ? 'schedule.reapproved' : 'schedule.created', actor: input.user.name,
+          before: existingSchedule ? { status: existingSchedule.status } : null,
+          after: { schedule_at: scheduleAt, status: 'scheduled' }, traceId: input.traceId, at,
         });
       }
 

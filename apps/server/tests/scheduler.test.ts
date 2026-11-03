@@ -65,6 +65,49 @@ describe('persistent scheduler', () => {
     expect(h.context.grants.getByProposal(h.proposalId)?.status).toBe('expired');
   });
 
+  it('reschedules an approved Grant and waits for the new start time', async () => {
+    const h = await createHarness(); open.push(h);
+    const scheduleAt = new Date(Date.now() + 60 * 60_000);
+    expect((await decideApprove(h, { scheduleAt, expiresAt: new Date(Date.now() + 2 * 60 * 60_000) })).statusCode).toBe(200);
+    const schedule = h.context.schedules.getByProposal(h.proposalId)!;
+    const changedAt = new Date(Date.now() + 3 * 60 * 60_000);
+    const changedExpiry = new Date(Date.now() + 4 * 60 * 60_000);
+    const changed = await h.app.inject({
+      method: 'POST', url: `/api/schedule/${schedule.id}/reschedule`,
+      headers: { authorization: `Bearer ${h.reviewerToken}` },
+      payload: { schedule_at: changedAt.toISOString(), expires_at: changedExpiry.toISOString(), timezone: 'Asia/Shanghai', reason: '调整窗口' },
+    });
+    expect(changed.statusCode).toBe(200);
+    expect(h.context.schedules.getByProposal(h.proposalId)).toMatchObject({ schedule_at: changedAt.toISOString(), status: 'scheduled' });
+    expect(h.context.grants.getByProposal(h.proposalId)).toMatchObject({ schedule_at: changedAt.toISOString(), status: 'active' });
+    expect(h.context.schedules.getByProposal(h.proposalId)?.approval_synced_at).toBeTruthy();
+
+    expect((await h.context.scheduler.runOnce(new Date(scheduleAt.getTime() + 60_000))).claimed).toBe(0);
+    expect((await h.context.scheduler.runOnce(new Date(changedAt.getTime() + 60_000))).claimed).toBe(1);
+  });
+
+  it('withdraws a schedule, revokes its Grant and permits reapproval', async () => {
+    const h = await createHarness(); open.push(h);
+    const scheduleAt = new Date(Date.now() + 60 * 60_000);
+    expect((await decideApprove(h, { scheduleAt, expiresAt: new Date(Date.now() + 2 * 60 * 60_000) })).statusCode).toBe(200);
+    const schedule = h.context.schedules.getByProposal(h.proposalId)!;
+    const withdrawn = await h.app.inject({
+      method: 'POST', url: `/api/schedule/${schedule.id}/withdraw`,
+      headers: { authorization: `Bearer ${h.reviewerToken}` }, payload: { reason: '需要重新评估' },
+    });
+    expect(withdrawn.statusCode).toBe(200);
+    expect(h.context.schedules.getByProposal(h.proposalId)).toMatchObject({ status: 'cancelled', last_error: '需要重新评估' });
+    expect(h.context.grants.getByProposal(h.proposalId)?.status).toBe('revoked');
+    expect(h.context.proposals.get(h.proposalId)?.status).toBe('pending_review');
+    expect((await h.context.scheduler.runOnce(new Date(scheduleAt.getTime() + 60_000))).claimed).toBe(0);
+
+    const renewedAt = new Date(Date.now() + 3 * 60 * 60_000);
+    const renewed = await decideApprove(h, { scheduleAt: renewedAt, expiresAt: new Date(Date.now() + 4 * 60 * 60_000) });
+    expect(renewed.statusCode).toBe(200);
+    expect(h.context.grants.getByProposal(h.proposalId)?.status).toBe('active');
+    expect(h.context.schedules.getByProposal(h.proposalId)).toMatchObject({ id: schedule.id, status: 'scheduled', schedule_at: renewedAt.toISOString() });
+  });
+
   it('recovers a persisted schedule after a console restart', async () => {
     const temp = mkdtempSync(join(tmpdir(), 'gatehouse-test-'));
     const dbPath = join(temp, 'console.db');
@@ -77,7 +120,7 @@ describe('persistent scheduler', () => {
 
       const { app, context } = await createApplication({
         config: {
-          databasePath: dbPath, demoSeed: false, pluginMode: 'mock', sessionSecret: 'test-session-secret-with-enough-length',
+          databasePath: dbPath, pluginMode: 'mock', sessionSecret: 'test-session-secret-with-enough-length',
           pluginEventSecret: 'test-event-secret-with-enough-length', pluginSharedSecret: 'test-plugin-secret-with-enough-length',
           schedulePollMs: 60_000, scheduleMaxConcurrency: 2, pluginMaxAttempts: 3,
         },
@@ -100,11 +143,14 @@ describe('persistent scheduler', () => {
       async decide(_payload: PluginDecisionRequest) {
         if (failOnce) { failOnce = false; throw new Error('network unavailable'); }
       },
+      async reschedule() {},
+      async withdraw() {},
       async execute(_payload: PluginExecuteRequest) { return { execution_id: 'exec', pr_url: null }; },
     };
     const { app, context } = await createApplication({
       config: {
-        databasePath: ':memory:', demoSeed: false, pluginMode: 'mock',
+        databasePath: ':memory:', pluginMode: 'mock',
+        bootstrapAdminEmail: 'admin@test.local', bootstrapAdminName: '管理员', bootstrapAdminPassword: 'test-admin-password-123',
         sessionSecret: 'test-session-secret-with-enough-length', pluginEventSecret: 'test-event-secret-with-enough-length',
         pluginSharedSecret: 'test-plugin-secret-with-enough-length', schedulePollMs: 60_000, scheduleMaxConcurrency: 2, pluginMaxAttempts: 3,
       },
@@ -139,11 +185,14 @@ describe('persistent scheduler', () => {
   it('waits for execution.finished after an asynchronous executor dispatch', async () => {
     const plugin: PluginClient = {
       async decide() {},
+      async reschedule() {},
+      async withdraw() {},
       async execute(payload: PluginExecuteRequest) { return { execution_id: payload.execution_id, ticket_id: 'ticket-1' } },
     };
     const { app, context } = await createApplication({
       config: {
-        databasePath: ':memory:', demoSeed: false, pluginMode: 'mock',
+        databasePath: ':memory:', pluginMode: 'mock',
+        bootstrapAdminEmail: 'admin@test.local', bootstrapAdminName: '管理员', bootstrapAdminPassword: 'test-admin-password-123',
         sessionSecret: 'test-session-secret-with-enough-length', pluginEventSecret: 'test-event-secret-with-enough-length',
         pluginSharedSecret: 'test-plugin-secret-with-enough-length', schedulePollMs: 60_000, scheduleMaxConcurrency: 2, pluginMaxAttempts: 3,
       },

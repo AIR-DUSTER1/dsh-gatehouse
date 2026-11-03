@@ -79,6 +79,20 @@ describe('console API', () => {
     expect(response.json()).toMatchObject({ decision: { comment: '' }, detail: { decisions: [{ comment: '' }] } });
   });
 
+  it('requires reviewer or admin access to change a schedule', async () => {
+    const h = await harness();
+    const scheduleAt = new Date(Date.now() + 3_600_000);
+    expect((await decideApprove(h, { scheduleAt, expiresAt: new Date(Date.now() + 7_200_000) })).statusCode).toBe(200);
+    const schedule = h.context.schedules.getByProposal(h.proposalId)!;
+    const headers = { authorization: `Bearer ${h.viewerToken}` };
+    const reschedule = await h.app.inject({ method: 'POST', url: `/api/schedule/${schedule.id}/reschedule`, headers,
+      payload: { schedule_at: new Date(Date.now() + 5_400_000).toISOString(),
+        expires_at: new Date(Date.now() + 9_000_000).toISOString(), timezone: 'Asia/Shanghai' } });
+    expect(reschedule.statusCode).toBe(403);
+    const withdraw = await h.app.inject({ method: 'POST', url: `/api/schedule/${schedule.id}/withdraw`, headers, payload: {} });
+    expect(withdraw.statusCode).toBe(403);
+  });
+
   it('verifies HMAC, ingests a proposal and deduplicates event id', async () => {
     const h = await harness();
     const body = pluginEvent('evt_created_1', 'evt1');
@@ -131,7 +145,7 @@ describe('console API', () => {
     });
     expect(reviewer.statusCode).toBe(403);
 
-    const adminToken = await h.login('admin@test.local');
+    const adminToken = await h.login('admin@test.local', 'test-admin-password-123');
     const admin = await h.app.inject({
       method: 'PUT', url: '/api/settings', headers: { authorization: `Bearer ${adminToken}` },
       payload: { max_concurrency: 3 },

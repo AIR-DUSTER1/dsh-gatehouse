@@ -1,17 +1,11 @@
 import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { Alert, Button, Card, Divider, Flex, Form, Input, Tag, Typography } from 'antd';
+import { Alert, Button, Card, Flex, Form, Input, Tag, Typography } from 'antd';
 import { ArrowRightOutlined, CheckCircleOutlined, LockOutlined, MailOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import { useAuth } from '../../hooks/useAuth';
 import { ApiError } from '../../api/client';
 
 const { Title, Paragraph, Text } = Typography;
-const demoAccounts = [
-  { name: '演示复核人', role: '复核人', email: 'li@example.com' },
-  { name: '演示管理员', role: '管理员', email: 'zhao@example.com' },
-  { name: '演示只读成员', role: '只读成员', email: 'wang@example.com' },
-];
-
 export function LoginPage() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
@@ -52,7 +46,7 @@ export function LoginPage() {
         <Card className="login-card" variant="borderless">
           <div className="login-heading"><Text className="page-eyebrow">SIGN IN</Text><Title level={2}>登录控制台</Title><Paragraph type="secondary">使用项目成员账号继续。</Paragraph></div>
           {error && <Alert type="error" showIcon title={error} className="login-alert" />}
-          <Form form={form} layout="vertical" initialValues={{ email: 'li@example.com', password: 'demo123' }} onFinish={submit} requiredMark={false}>
+          <Form form={form} layout="vertical" onFinish={submit} requiredMark={false}>
             <Form.Item label="工作邮箱" name="email" rules={[{ required: true, type: 'email', message: '请输入有效邮箱' }]}>
               <Input size="large" prefix={<MailOutlined />} placeholder="name@company.com" autoComplete="username" />
             </Form.Item>
@@ -61,15 +55,6 @@ export function LoginPage() {
             </Form.Item>
             <Button type="primary" htmlType="submit" size="large" loading={loading} block iconPlacement="end" icon={<ArrowRightOutlined />}>进入控制台</Button>
           </Form>
-          <Divider plain><Text type="secondary">演示账号</Text></Divider>
-          <Flex vertical gap={8}>
-            {demoAccounts.map(account => (
-              <Button key={account.email} className="demo-account-button" onClick={() => { form.setFieldsValue({ email: account.email, password: 'demo123' }); setError(''); }}>
-                <span className="demo-account-identity"><strong>{account.name}</strong><Text type="secondary" className="demo-account-role">{account.role}</Text></span><Text code>{account.email}</Text>
-              </Button>
-            ))}
-          </Flex>
-          <Text type="secondary" className="demo-password">统一密码：<Text code>demo123</Text></Text>
         </Card>
       </section>
     </div>
