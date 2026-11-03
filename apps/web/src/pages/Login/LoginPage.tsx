@@ -65,7 +65,7 @@ export function LoginPage() {
           <Flex vertical gap={8}>
             {demoAccounts.map(account => (
               <Button key={account.email} className="demo-account-button" onClick={() => { form.setFieldsValue({ email: account.email, password: 'demo123' }); setError(''); }}>
-                <span><strong>{account.name}</strong><Text type="secondary">{account.role}</Text></span><Text code>{account.email}</Text>
+                <span className="demo-account-identity"><strong>{account.name}</strong><Text type="secondary" className="demo-account-role">{account.role}</Text></span><Text code>{account.email}</Text>
               </Button>
             ))}
           </Flex>
