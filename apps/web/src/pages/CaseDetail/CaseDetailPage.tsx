@@ -50,9 +50,10 @@ export function CaseDetailPage() {
     if (!action) return;
     if (action === 'approve' && (!values.schedule_at || !values.expires_at)) { setFormError('请选择排期时间和授权过期时间。'); return; }
     setSubmitting(true); setFormError('');
+    const comment = values.comment?.trim() ?? '';
     const payload = action === 'approve'
-      ? { decision: action, comment: values.comment.trim(), schedule_at: values.schedule_at!.toISOString(), expires_at: values.expires_at!.toISOString(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, risk_confirmed: true }
-      : { decision: action, comment: values.comment.trim(), risk_confirmed: true };
+      ? { decision: action, comment, schedule_at: values.schedule_at!.toISOString(), expires_at: values.expires_at!.toISOString(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, risk_confirmed: true }
+      : { decision: action, comment, risk_confirmed: true };
     try {
       await api<DecisionResponse>(`/api/proposals/${proposal.id}/decision`, {
         method: 'POST', headers: { 'idempotency-key': crypto.randomUUID() }, body: JSON.stringify(payload),
@@ -110,7 +111,7 @@ export function CaseDetailPage() {
             </Card>
 
             <Card title="D / 决策与审计" variant="borderless">
-              {latestDecision ? <Alert type={latestDecision.decision === 'approve' ? 'success' : latestDecision.decision === 'reject' ? 'error' : 'warning'} showIcon title={decisionLabels[latestDecision.decision]} description={<><div>{latestDecision.comment}</div><Text type="secondary" className="small-text">{latestDecision.reviewer} · {formatFullDate(latestDecision.created_at)}</Text></>} /> : <Text type="secondary">尚未产生人工决策。</Text>}
+              {latestDecision ? <Alert type={latestDecision.decision === 'approve' ? 'success' : latestDecision.decision === 'reject' ? 'error' : 'warning'} showIcon title={decisionLabels[latestDecision.decision]} description={<><div>{latestDecision.comment || <Text type="secondary">未填写审批意见</Text>}</div><Text type="secondary" className="small-text">{latestDecision.reviewer} · {formatFullDate(latestDecision.created_at)}</Text></>} /> : <Text type="secondary">尚未产生人工决策。</Text>}
               <Timeline className="audit-timeline" items={data.audit_events.map(event => ({ content: <Flex justify="space-between" gap={12}><div><Text strong>{actionLabels[event.action] ?? event.action}</Text><br /><Text type="secondary" className="small-text">{event.actor}</Text></div><Text type="secondary" className="small-text">{formatFullDate(event.created_at)}</Text></Flex> }))} />
             </Card>
           </Flex>
@@ -165,7 +166,7 @@ export function CaseDetailPage() {
       >
         <Form<DecisionForm> form={form} layout="vertical" onFinish={submit} requiredMark={false}>
           {action === 'approve' && <Row gutter={12}><Col span={12}><Form.Item label="排期时间" name="schedule_at" rules={[{ required: true }]}><DatePicker showTime className="full-width" suffixIcon={<CalendarOutlined />} /></Form.Item></Col><Col span={12}><Form.Item label="授权过期时间" name="expires_at" rules={[{ required: true }]}><DatePicker showTime className="full-width" /></Form.Item></Col></Row>}
-          <Form.Item label="审批意见" name="comment" rules={[{ required: true, min: 2, message: '请输入至少 2 个字符' }]}><Input.TextArea rows={4} placeholder="说明批准依据、驳回原因或需要补充的信息" /></Form.Item>
+          <Form.Item label="审批意见（选填）" name="comment"><Input.TextArea rows={4} maxLength={2000} showCount placeholder="可补充批准依据、驳回原因或需要说明的信息" /></Form.Item>
           <Form.Item name="risk_confirmed" valuePropName="checked" rules={[{ validator: (_, value) => value ? Promise.resolve() : Promise.reject(new Error('请确认已阅读风险与范围')) }]}><Checkbox>我已阅读并确认执行范围、影响文件、风险说明和测试计划。</Checkbox></Form.Item>
           {formError && <Alert type="error" showIcon title={formError} />}
           <Divider />

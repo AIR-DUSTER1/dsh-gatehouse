@@ -6,10 +6,10 @@
     {
       "type": "object",
       "additionalProperties": false,
-      "required": ["decision", "comment", "schedule_at", "expires_at", "timezone", "risk_confirmed"],
+      "required": ["decision", "schedule_at", "expires_at", "timezone", "risk_confirmed"],
       "properties": {
         "decision": { "const": "approve" },
-        "comment": { "type": "string", "minLength": 2 },
+        "comment": { "type": "string", "maxLength": 2000, "default": "" },
         "schedule_at": { "type": "string", "format": "date-time" },
         "expires_at": { "type": "string", "format": "date-time" },
         "timezone": { "type": "string", "minLength": 1 },
@@ -19,10 +19,10 @@
     {
       "type": "object",
       "additionalProperties": false,
-      "required": ["decision", "comment", "risk_confirmed"],
+      "required": ["decision", "risk_confirmed"],
       "properties": {
         "decision": { "enum": ["reject", "request_info"] },
-        "comment": { "type": "string", "minLength": 2 },
+        "comment": { "type": "string", "maxLength": 2000, "default": "" },
         "risk_confirmed": { "const": true }
       }
     }

@@ -62,6 +62,23 @@ describe('console API', () => {
     expect(self.json()).toMatchObject({ error: { code: 'SELF_APPROVAL_FORBIDDEN' } });
   });
 
+  it('accepts an approval without a review comment', async () => {
+    const h = await harness();
+    const fixture = createReviewFixture(h.context, '另一位提出人', '无需补充审批意见');
+    const response = await h.app.inject({
+      method: 'POST', url: `/api/proposals/${fixture.proposal.id}/decision`,
+      headers: { authorization: `Bearer ${h.reviewerToken}`, 'idempotency-key': randomUUID() },
+      payload: {
+        decision: 'approve',
+        schedule_at: new Date(Date.now() + 3_600_000).toISOString(),
+        expires_at: new Date(Date.now() + 7_200_000).toISOString(),
+        timezone: 'Asia/Shanghai', risk_confirmed: true,
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ decision: { comment: '' }, detail: { decisions: [{ comment: '' }] } });
+  });
+
   it('verifies HMAC, ingests a proposal and deduplicates event id', async () => {
     const h = await harness();
     const body = pluginEvent('evt_created_1', 'evt1');

@@ -45,6 +45,27 @@ describe('JSON schemas', () => {
     expect(validate(value)).toBe(true);
   });
 
+  it('accepts decisions without a review comment', () => {
+    const values = [
+      {
+        decision: 'approve', schedule_at: '2026-11-03T02:00:00.000Z', expires_at: '2026-11-04T02:00:00.000Z',
+        timezone: 'Asia/Shanghai', risk_confirmed: true,
+      },
+      { decision: 'reject', risk_confirmed: true },
+      { decision: 'request_info', risk_confirmed: true },
+    ];
+    const validate = ajv.getSchema('https://dsh.local/schemas/decision.schema.json')!;
+    for (const value of values) {
+      expect(decisionInputSchema.parse(value).comment).toBe('');
+      expect(validate(value)).toBe(true);
+    }
+    expect(pluginDecisionRequestSchema.parse({
+      proposal_id: 'proposal-1', decision: 'approve', reviewer: '演示复核人', requirement_hash: hash,
+      scope_hash: hash, schedule_at: '2026-11-03T02:00:00.000Z', expires_at: '2026-11-04T02:00:00.000Z',
+      trace_id: 'trace-1', idempotency_key: 'idem-1',
+    }).comment).toBe('');
+  });
+
   it('validates the plugin event envelope and decision command', () => {
     const event = {
       version: '1.0', event_id: 'evt-1', event_type: 'proposal.created',
