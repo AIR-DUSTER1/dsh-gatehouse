@@ -160,6 +160,7 @@ export interface ScheduleListItem extends ScheduleRecord {
   requester: string;
   risk_level: RiskLevel;
   proposal_summary: string;
+  retryable: boolean;
 }
 
 export interface QueueSummary {
@@ -310,12 +311,17 @@ export const pluginDecisionRequestSchema = z.object({
   decision: z.enum(DECISIONS),
   reviewer: z.string().min(1),
   comment: z.string().trim().max(2000).default(''),
+  grant_id: z.string().min(1).optional(),
   requirement_hash: hashSchema,
   scope_hash: hashSchema,
   schedule_at: isoDateSchema.optional(),
   expires_at: isoDateSchema.optional(),
   trace_id: z.string().min(1),
   idempotency_key: z.string().min(1),
+}).superRefine((value, context) => {
+  if (value.decision === 'approve' && !value.grant_id) {
+    context.addIssue({ code: 'custom', path: ['grant_id'], message: '批准请求必须携带 Grant ID' });
+  }
 });
 
 export const pluginExecuteRequestSchema = z.object({

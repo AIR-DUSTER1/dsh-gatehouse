@@ -5,6 +5,7 @@ export interface PluginDecisionRequest {
   decision: 'approve' | 'reject' | 'request_info';
   reviewer: string;
   comment: string;
+  grant_id?: string;
   requirement_hash: string;
   scope_hash: string;
   schedule_at?: string;

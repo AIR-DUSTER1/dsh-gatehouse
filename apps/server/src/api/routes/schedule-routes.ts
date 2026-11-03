@@ -57,4 +57,13 @@ export async function registerScheduleRoutes(app: FastifyInstance, context: AppC
     await context.dispatcher.drain();
     return { schedule: context.schedules.get(id), trace_id: trace };
   });
+
+  app.post('/api/schedule/:id/retry-execution', async (request) => {
+    const user = requestUser(request, context.config.sessionSecret);
+    const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
+    const trace = traceId(request);
+    context.scheduleControl.retryExecution(id, user, trace);
+    await context.dispatcher.drain();
+    return { schedule: context.schedules.get(id), trace_id: trace };
+  });
 }

@@ -19,6 +19,8 @@
 | 改期后按新时间执行 | 旧时间不领取、新时间执行一次 | 通过 |
 | 撤回排期 | Grant revoked、Schedule cancelled、回到 pending_review | 通过 |
 | 撤回后重新审批 | 复用排期事实并生成新的有效 Grant | 通过 |
+| 两侧 Grant ID 一致 | Decision 携带 Gatehouse canonical `grant_id`，执行校验通过 | 通过 |
+| 执行同步失败可重试 | dead outbox 复用原 execution_id 重新投递 | 通过 |
 | Grant 过期拒绝执行 | 状态 failed / expired | 通过 |
 | 控制台重启恢复排期 | 文件数据库重启后继续执行 | 通过 |
 | outbox 失败可重试 | 首次失败 pending，第二次 delivered | 通过 |

@@ -124,6 +124,40 @@ export class ScheduleControlService {
     });
   }
 
+  /** Retry a dead execution dispatcher message with the same execution id, when the Grant is still usable. */
+  retryExecution(scheduleId: string, user: User, traceId: string, now = new Date()): void {
+    requireRole(user, ['reviewer', 'admin']);
+    const schedule = this.schedules.get(scheduleId);
+    if (!schedule) throw new NotFoundError('排期', scheduleId);
+    if (schedule.status !== 'failed' || !schedule.execution_id) {
+      throw new DomainError('SCHEDULE_NOT_RETRYABLE', '只有执行同步失败且保留 execution_id 的排期可以重试', '刷新排期状态后重试', 409);
+    }
+    const grant = this.grants.get(schedule.grant_id);
+    if (!grant || grant.status !== 'active' || grant.consumed_at) {
+      throw new DomainError('GRANT_NOT_ACTIVE', '当前审批授权已失效，不能重试执行', '撤回排期并重新审批', 409);
+    }
+    const proposal = this.proposals.get(schedule.proposal_id);
+    if (!proposal) throw new NotFoundError('提案', schedule.proposal_id);
+    const reviewCase = this.cases.get(proposal.review_case_id);
+    if (!reviewCase) throw new NotFoundError('复核需求', proposal.review_case_id);
+    const dead = this.outbox.findDead('plugin.execute', proposal.id);
+    const payload = dead?.payload as { execution_id?: string } | undefined;
+    if (!dead || payload?.execution_id !== schedule.execution_id) {
+      throw new DomainError('EXECUTION_RETRY_NOT_AVAILABLE', '没有可重试的执行同步消息', '若执行已经进入 Worker，请查看执行回执', 409);
+    }
+    const at = nowIso(now);
+    transaction(this.db, () => {
+      if (!this.outbox.requeueDead(dead.id, at)) {
+        throw new DomainError('EXECUTION_RETRY_NOT_AVAILABLE', '执行同步消息已被处理', '刷新排期状态后重试', 409);
+      }
+      this.schedules.markRetryExecuting(schedule.id, at);
+      this.proposals.setStatus(proposal.id, 'executing', at);
+      this.cases.setStatus(reviewCase.id, 'executing', at);
+      this.audit.record({ entityType: 'review_case', entityId: reviewCase.id, action: 'execution.retry_requested', actor: user.name,
+        before: { status: schedule.status, outbox_id: dead.id }, after: { status: 'executing', execution_id: schedule.execution_id }, traceId, at });
+    });
+  }
+
   private requireControllable(scheduleId: string) {
     const schedule = this.schedules.get(scheduleId);
     if (!schedule) throw new NotFoundError('排期', scheduleId);

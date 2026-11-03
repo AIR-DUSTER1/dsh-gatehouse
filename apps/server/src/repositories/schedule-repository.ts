@@ -9,7 +9,7 @@ type ScheduleRow = {
 };
 
 type ScheduleListRow = ScheduleRow & {
-  review_case_id: string; title: string; requester: string; risk_level: RiskLevel; proposal_summary: string;
+  review_case_id: string; title: string; requester: string; risk_level: RiskLevel; proposal_summary: string; retryable: number;
 };
 
 export class ScheduleRepository {
@@ -55,14 +55,18 @@ export class ScheduleRepository {
   list(status?: ScheduleStatus): ScheduleListItem[] {
     const where = status ? 'WHERE s.status = ?' : '';
     const params = status ? [status] : [];
-    return this.db.prepare(`
-      SELECT s.*, c.id AS review_case_id, c.title, c.requester, c.risk_level, p.summary AS proposal_summary
+    const rows = this.db.prepare(`
+      SELECT s.*, c.id AS review_case_id, c.title, c.requester, c.risk_level, p.summary AS proposal_summary,
+        CASE WHEN EXISTS (
+          SELECT 1 FROM outbox_messages o WHERE o.topic = 'plugin.execute' AND o.aggregate_id = s.proposal_id AND o.status = 'dead'
+        ) THEN 1 ELSE 0 END AS retryable
       FROM schedules s
       JOIN proposals p ON p.id = s.proposal_id
       JOIN review_cases c ON c.id = p.review_case_id
       ${where}
       ORDER BY s.schedule_at ASC
     `).all(...params) as ScheduleListRow[];
+    return rows.map(row => ({ ...row, retryable: row.retryable === 1 }));
   }
 
   due(now: string, limit: number): ScheduleRecord[] {
@@ -96,6 +100,10 @@ export class ScheduleRepository {
       UPDATE schedules SET status = 'executing', execution_id = ?, attempts = attempts + 1,
         last_error = NULL, updated_at = ? WHERE id = ?
     `).run(executionId, at, id);
+  }
+
+  markRetryExecuting(id: string, at: string): void {
+    this.db.prepare("UPDATE schedules SET status = 'executing', last_error = NULL, updated_at = ? WHERE id = ?").run(at, id);
   }
 
   retry(id: string, error: string, at: string): void {
