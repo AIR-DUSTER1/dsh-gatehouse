@@ -544,7 +544,7 @@ code, .ant-typography code {
 .login-heading p.ant-typography { margin: 0; }
 .login-alert { margin-bottom: 18px; }
 .demo-account-button { height: 48px; display: flex; align-items: center; justify-content: space-between; }
-.demo-account-button > span:first-child { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.demo-account-button .demo-account-identity { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .demo-account-identity strong { white-space: nowrap; }
 .demo-account-role { padding-left: 10px; border-left: 1px solid var(--line-strong); white-space: nowrap; }
 .demo-password { display: block; text-align: center; margin-top: 14px; font-size: 11px; font-family: var(--font-mono); }
