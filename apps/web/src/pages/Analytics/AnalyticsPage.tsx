@@ -1,7 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Alert, Button, Card, Col, Empty, Flex, Progress, Row, Segmented, Space, Statistic, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import { LineChart } from 'echarts/charts';
+import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
+import * as echarts from 'echarts/core';
+import type { ECharts, EChartsCoreOption } from 'echarts/core';
+import { CanvasRenderer } from 'echarts/renderers';
 import {
   ApartmentOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, ReloadOutlined,
   SafetyCertificateOutlined, ThunderboltOutlined, WarningOutlined,
@@ -12,41 +17,82 @@ import { formatFullDate } from '../../lib/format';
 import { workspacePath } from '../../hooks/useWorkspace';
 import { ErrorState, LoadingState, PageHeader } from '../../components/ui';
 
-const { Text, Title } = Typography;
+echarts.use([LineChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer]);
+
+const { Text } = Typography;
 
 const rangeLabels = { '7d': '近 7 天', '30d': '近 30 天', '90d': '近 90 天' } as const;
 type AnalyticsRange = keyof typeof rangeLabels;
 
 function TrendChart({ points }: { points: AnalyticsOverview['trend'] }) {
-  const width = 760;
-  const height = 220;
-  const padding = 28;
-  const max = Math.max(1, ...points.flatMap(point => [point.created, point.completed, point.failed]));
-  const line = (key: 'created' | 'completed' | 'failed') => points.map((point, index) => {
-    const x = padding + (index / Math.max(1, points.length - 1)) * (width - padding * 2);
-    const y = height - padding - (point[key] / max) * (height - padding * 2);
-    return `${index === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
-  return <div className="analytics-chart">
-    <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="任务新建、完成与失败趋势">
-      {[0, 0.25, 0.5, 0.75, 1].map((ratio) => <line key={ratio} x1={padding} x2={width - padding}
-        y1={padding + ratio * (height - padding * 2)} y2={padding + ratio * (height - padding * 2)} className="chart-grid" />)}
-      <path d={line('created')} className="chart-line chart-line--created" />
-      <path d={line('completed')} className="chart-line chart-line--completed" />
-      <path d={line('failed')} className="chart-line chart-line--failed" />
-      {points.map((point, index) => {
-        if (index % Math.ceil(points.length / 6) !== 0 && index !== points.length - 1) return null;
-        const x = padding + (index / Math.max(1, points.length - 1)) * (width - padding * 2);
-        return <text key={point.date} x={x} y={height - 7} textAnchor="middle" className="chart-label">{point.date.slice(5)}</text>;
-      })}
-    </svg>
-    <Flex gap={18} className="chart-legend">
-      <span><i className="legend-dot legend-dot--created" />新建</span>
-      <span><i className="legend-dot legend-dot--completed" />完成</span>
-      <span><i className="legend-dot legend-dot--failed" />失败</span>
-      <Text type="secondary" className="push-right">峰值 {max}</Text>
-    </Flex>
-  </div>;
+  const container = useRef<HTMLDivElement>(null);
+  const chart = useRef<ECharts | null>(null);
+  const option = useMemo<EChartsCoreOption>(() => ({
+    animationDuration: 420,
+    color: ['#191817', '#2c7a4b', '#c73325'],
+    grid: { left: 18, right: 24, top: 28, bottom: 56, containLabel: true },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: '#141311',
+      borderColor: '#141311',
+      padding: [8, 10],
+      textStyle: { color: '#f2f1ec', fontFamily: 'IBM Plex Mono, monospace', fontSize: 11 },
+      axisPointer: { type: 'line', lineStyle: { color: '#a39e93', type: 'dashed' } },
+    },
+    legend: {
+      left: 0,
+      bottom: 0,
+      itemWidth: 16,
+      itemHeight: 2,
+      itemGap: 18,
+      icon: 'rect',
+      textStyle: { color: '#6b675e', fontFamily: 'IBM Plex Mono, monospace', fontSize: 10 },
+      data: ['新建', '完成', '失败'],
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: points.map(point => point.date.slice(5)),
+      axisLine: { lineStyle: { color: '#ddd9cf' } },
+      axisTick: { show: false },
+      axisLabel: { color: '#a39e93', fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, hideOverlap: true },
+    },
+    yAxis: {
+      type: 'value',
+      minInterval: 1,
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: '#a39e93', fontFamily: 'IBM Plex Mono, monospace', fontSize: 10 },
+      splitLine: { lineStyle: { color: '#e8e5dd', type: 'dashed' } },
+    },
+    series: [
+      { name: '新建', type: 'line', data: points.map(point => point.created), showSymbol: false, symbolSize: 6,
+        lineStyle: { width: 2.2 }, emphasis: { focus: 'series' } },
+      { name: '完成', type: 'line', data: points.map(point => point.completed), showSymbol: false, symbolSize: 6,
+        lineStyle: { width: 2.2 }, emphasis: { focus: 'series' } },
+      { name: '失败', type: 'line', data: points.map(point => point.failed), showSymbol: false, symbolSize: 6,
+        lineStyle: { width: 2.2 }, emphasis: { focus: 'series' } },
+    ],
+  }), [points]);
+
+  useEffect(() => {
+    if (!container.current) return;
+    const instance = echarts.init(container.current, undefined, { renderer: 'canvas' });
+    chart.current = instance;
+    const resize = new ResizeObserver(() => instance.resize());
+    resize.observe(container.current);
+    return () => {
+      resize.disconnect();
+      instance.dispose();
+      chart.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    chart.current?.setOption(option, { notMerge: true });
+  }, [option]);
+
+  return <div ref={container} className="echarts-chart" role="img" aria-label="任务新建、完成与失败趋势图" />;
 }
 
 function Distribution({ title, items }: { title: string; items: Array<{ label: string; value: number }> }) {
@@ -78,6 +124,7 @@ export function AnalyticsPage() {
   if (loading) return <LoadingState label="正在汇总全部工作区数据…" />;
   if (error || !data) return <ErrorState message={error?.message ?? '全局统计加载失败'} action={error?.body.error.action} onRetry={reload} />;
 
+  const trendPeak = Math.max(0, ...data.trend.flatMap(point => [point.created, point.completed, point.failed]));
   const metrics = [
     { label: '工作区', value: data.totals.workspaces, suffix: '个', icon: <ApartmentOutlined />, hint: `${data.totals.active_workspaces} 个启用 · ${data.totals.error_workspaces} 个异常` },
     { label: '待复核', value: data.totals.pending_review, suffix: '项', icon: <SafetyCertificateOutlined />, hint: '全工作区人工决策队列' },
@@ -97,7 +144,8 @@ export function AnalyticsPage() {
       <Row gutter={[12, 12]}>
         {metrics.map((metric, index) => <Col xs={12} xl={6} key={metric.label}><Card variant="borderless" className="metric-card"><Flex justify="space-between"><div><Flex align="center" gap={8}><span className="index-no">A.{String(index + 1).padStart(2, '0')}</span><Text type="secondary">{metric.label}</Text></Flex><Statistic value={metric.value} suffix={metric.suffix} /><Text type="secondary" className="metric-hint">{metric.hint}</Text></div><span className="metric-icon">{metric.icon}</span></Flex></Card></Col>)}
       </Row>
-      <Card title={<Space><span className="index-no">T.01</span>任务趋势</Space>} extra={<Text type="secondary">{rangeLabels[range]}</Text>} variant="borderless">
+      <Card title={<Space><span className="index-no">T.01</span>任务趋势</Space>}
+        extra={<Space size={14} separator={<span className="card-extra-divider" />}><Text type="secondary">峰值 {trendPeak}</Text><Text type="secondary">{rangeLabels[range]}</Text></Space>} variant="borderless">
         <TrendChart points={data.trend} />
       </Card>
       <Row gutter={[12, 12]}>

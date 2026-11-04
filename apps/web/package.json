@@ -14,6 +14,7 @@
     "@gatehouse/contract": "workspace:*",
     "antd": "^6.6.8",
     "dayjs": "^1.11.19",
+    "echarts": "^6.1.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.9.5"

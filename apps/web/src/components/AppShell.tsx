@@ -58,8 +58,8 @@ function Navigation({ onNavigate }: { onNavigate?: () => void }) {
   const { currentId, preferred } = useWorkspace();
   const suffix = workspaceSuffix(location.pathname);
   const navigationId = currentId ?? preferred?.id ?? null;
-  const selected = navigationId
-    ? workspacePath(navigationId, suffix.startsWith('review/') ? 'review' : suffix)
+  const selected = currentId
+    ? workspacePath(currentId, suffix.startsWith('review/') ? 'review' : suffix)
     : location.pathname;
   return (
     <Menu

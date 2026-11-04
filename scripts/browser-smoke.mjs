@@ -47,6 +47,11 @@ try {
     await page.goto(`http://127.0.0.1:5173${path}`, { waitUntil: 'networkidle' });
     console.log(`SMOKE_NAV ${path} -> ${new URL(page.url()).pathname} :: ${heading}`);
     await page.getByRole('heading', { name: heading }).waitFor();
+    if (path === '/workspaces' || path === '/analytics') {
+      const selected = page.locator('.app-sider .ant-menu-item-selected');
+      assert(await selected.count() === 1, `${heading} 应只选中一个侧栏菜单`);
+      assert((await selected.first().innerText()).includes(heading === '工作区与仓库' ? '工作区' : '全局统计'), `${heading} 选中的菜单不正确`);
+    }
     if (path === '/workspaces') {
       const table = page.locator('.ant-table-content').first();
       const overflow = await table.evaluate(node => ({ client: node.clientWidth, scroll: node.scrollWidth }));
@@ -54,9 +59,14 @@ try {
       await page.screenshot({ path: '.run/screens/02-workspaces.png', fullPage: true });
     }
     if (path === '/analytics') {
+      const chart = page.locator('.echarts-chart canvas');
+      await chart.waitFor({ state: 'visible' });
+      const chartBox = await chart.boundingBox();
+      assert((chartBox?.width ?? 0) > 0 && (chartBox?.height ?? 0) > 0, 'ECharts 趋势图未正确渲染');
       const table = page.locator('.ant-table-content').first();
       const scrollable = await table.evaluate(node => node.scrollWidth > node.clientWidth);
       assert(scrollable, '全局统计宽表没有提供横向滚动');
+      await page.waitForTimeout(500);
       await page.screenshot({ path: '.run/screens/03-analytics.png', fullPage: true });
     }
   }

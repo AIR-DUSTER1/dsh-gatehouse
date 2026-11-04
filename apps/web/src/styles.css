@@ -601,20 +601,8 @@ code, .ant-typography code {
 .workspace-member-copy .ant-typography { margin: 0; }
 
 /* ---------- 全局统计 ---------- */
-.analytics-chart { width: 100%; overflow: hidden; }
-.analytics-chart svg { display: block; width: 100%; height: auto; min-height: 220px; }
-.chart-grid { stroke: var(--line-soft); stroke-width: 1; }
-.chart-line { fill: none; stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: square; }
-.chart-line--created { stroke: var(--ink); }
-.chart-line--completed { stroke: var(--ok); }
-.chart-line--failed { stroke: var(--bad); }
-.chart-label { fill: var(--ink-faint); font-family: var(--font-mono); font-size: 9px; }
-.chart-legend { margin-top: 6px; color: var(--ink-soft); font-size: 11px; }
-.chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
-.legend-dot { width: 16px; height: 2px; display: inline-block; }
-.legend-dot--created { background: var(--ink); }
-.legend-dot--completed { background: var(--ok); }
-.legend-dot--failed { background: var(--bad); }
+.echarts-chart { width: 100%; height: 248px; min-height: 248px; }
+.card-extra-divider { display: inline-block; width: 1px; height: 11px; background: var(--line); }
 .failure-row { padding: 12px 0; border-bottom: 1px solid var(--line-soft); }
 .failure-row:last-child { border-bottom: 0; }
 .failure-meta { flex: 0 0 160px; text-align: right; }
