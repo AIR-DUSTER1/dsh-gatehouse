@@ -38,6 +38,12 @@ try {
     const selectedMeta = await page.locator('.workspace-card-meta').innerText();
     assert(selectedMeta.replace(/\s+/g, '').includes(expectedRepository.replace(/\s+/g, '')), '侧栏当前工作区未显示监听仓库');
   }
+  const workspaceSelectStyle = await page.locator('.workspace-select').evaluate(node => {
+    const style = getComputedStyle(node);
+    return { background: style.backgroundColor, color: style.color };
+  });
+  assert(!['rgb(255, 255, 255)', 'rgb(253, 253, 250)'].includes(workspaceSelectStyle.background), '工作区选择器仍是白色选中底');
+  assert(!(await page.locator('.workspace-select .ant-select-content .anticon-github').first().isVisible()), '工作区选择器不应在标题旁重复显示 GitHub 图标');
   const workspaceBase = new URL(page.url()).pathname.replace(/\/$/, '');
   await page.screenshot({ path: '.run/screens/01-dashboard.png', fullPage: true });
 

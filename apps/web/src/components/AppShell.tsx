@@ -141,8 +141,8 @@ export function AppShell() {
             <Flex align="center" gap={9} className="workspace-option">
               <span className={`workspace-dot workspace-dot--${workspace.status}`} />
               <span className="workspace-option-copy">
-                <strong>{workspace.name}</strong>
-                <small>{workspace.repositories[0]?.repository_key ?? '尚未绑定仓库'}</small>
+                <strong title={workspace.name}>{workspace.name}</strong>
+                <small title={workspace.repositories[0]?.repository_key ?? '尚未绑定仓库'}>{workspace.repositories[0]?.repository_key ?? '尚未绑定仓库'}</small>
               </span>
               {workspace.repositories[0] ? <ProviderMark provider={workspace.repositories[0].provider} /> : null}
             </Flex>
