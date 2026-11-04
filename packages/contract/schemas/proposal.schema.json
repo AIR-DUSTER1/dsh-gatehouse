@@ -19,6 +19,9 @@
     "risk": { "enum": ["low", "medium", "high", "critical"] },
     "risk_reason": { "type": "string", "minLength": 1 },
     "status": { "enum": ["pending_review", "info_requested", "approved", "rejected", "superseded", "scheduled", "executing", "completed", "failed"] },
+    "workspace_id": { "type": ["string", "null"] },
+    "repository_id": { "type": ["string", "null"] },
+    "workspace_binding_hash": { "anyOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] },
     "created_at": { "type": "string", "format": "date-time" },
     "updated_at": { "type": "string", "format": "date-time" }
   },

@@ -121,7 +121,7 @@ describe('persistent scheduler', () => {
     expect(failed.status).toBe('failed');
     expect(failed.execution_id).toBeTruthy();
     expect(h.context.outbox.findDead('plugin.execute', h.proposalId)).toBeTruthy();
-    expect(h.context.query.listSchedules()[0]?.retryable).toBe(true);
+    expect(h.context.query.listSchedules(h.workspaceId)[0]?.retryable).toBe(true);
 
     plugin.failExecution = false;
     const retried = await h.app.inject({ method: 'POST', url: `/api/schedule/${failed.id}/retry-execution`,
@@ -149,7 +149,8 @@ describe('persistent scheduler', () => {
           schedulePollMs: 60_000, scheduleMaxConcurrency: 2, pluginMaxAttempts: 3,
         },
       });
-      const second: TestHarness = { app, context, reviewerToken: '', viewerToken: '', caseId: '', proposalId: 'proposal_' + first.proposalId.split('_').slice(1).join('_'), login: async () => '' };
+      const second: TestHarness = { app, context, reviewerToken: '', viewerToken: '', adminToken: '', workspaceId: first.workspaceId,
+        repositoryId: first.repositoryId, caseId: '', proposalId: 'proposal_' + first.proposalId.split('_').slice(1).join('_'), login: async () => '' };
       open.push(second);
       const run = await context.scheduler.runOnce(new Date(scheduleAt.getTime() + 60_000));
       expect(run.claimed).toBe(1);
@@ -170,6 +171,10 @@ describe('persistent scheduler', () => {
       async reschedule() {},
       async withdraw() {},
       async execute(_payload: PluginExecuteRequest) { return { execution_id: 'exec', pr_url: null }; },
+      async validateRepository() { throw new Error('not used'); },
+      async describeRepository() { throw new Error('not used'); },
+      async syncWorkspaces() { return { applied: 0, disabled: 0, config_version: 1, config_hash: `sha256:${'0'.repeat(64)}`, replayed: false }; },
+      async reassignProposal() {},
     };
     const { app, context } = await createApplication({
       config: {
@@ -182,9 +187,10 @@ describe('persistent scheduler', () => {
     });
     const fixture = createReviewFixture(context, '陈晓', '验证 outbox 重试');
     const now = new Date();
+    const reviewer = context.users.list().find((user) => user.role === 'admin')!;
     context.approval.decide({
       proposalId: fixture.proposal.id,
-      user: { id: 'reviewer', email: 'reviewer@test.local', name: '复核人甲', role: 'reviewer' },
+      user: reviewer,
       idempotencyKey: 'outbox-retry-key',
       traceId: 'outbox-retry-trace',
       now,
@@ -212,6 +218,10 @@ describe('persistent scheduler', () => {
       async reschedule() {},
       async withdraw() {},
       async execute(payload: PluginExecuteRequest) { return { execution_id: payload.execution_id, ticket_id: 'ticket-1' } },
+      async validateRepository() { throw new Error('not used'); },
+      async describeRepository() { throw new Error('not used'); },
+      async syncWorkspaces() { return { applied: 0, disabled: 0, config_version: 1, config_hash: `sha256:${'0'.repeat(64)}`, replayed: false }; },
+      async reassignProposal() {},
     };
     const { app, context } = await createApplication({
       config: {
@@ -224,9 +234,10 @@ describe('persistent scheduler', () => {
     });
     const fixture = createReviewFixture(context, '陈晓', '验证异步执行回执');
     const now = new Date();
+    const reviewer = context.users.list().find((user) => user.role === 'admin')!;
     context.approval.decide({
       proposalId: fixture.proposal.id,
-      user: { id: 'reviewer', email: 'reviewer@test.local', name: '复核人甲', role: 'reviewer' },
+      user: reviewer,
       idempotencyKey: 'async-execution-approval', traceId: 'async-trace', now,
       decision: {
         decision: 'approve', comment: '批准异步执行', risk_confirmed: true, timezone: 'Asia/Shanghai',

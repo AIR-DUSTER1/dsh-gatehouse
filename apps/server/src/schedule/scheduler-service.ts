@@ -9,6 +9,7 @@ import type { SettingsRepository } from '../repositories/settings-repository.js'
 import type { AuditService } from '../audit/audit-service.js';
 import type { OutboxDispatcher } from './outbox-dispatcher.js';
 import { newId, nowIso } from '../domain/utils.js';
+import type { WorkspaceService } from '../domain/workspace-service.js';
 
 /** Persistent scheduler. Every wake reads due work from SQLite; no in-memory timer is authoritative. */
 export class SchedulerService {
@@ -28,6 +29,7 @@ export class SchedulerService {
     private readonly pollMs: number,
     private readonly defaultMaxConcurrency: number,
     private readonly maxAttempts: number,
+    private readonly workspaceService: WorkspaceService,
   ) {}
 
   start(): void {
@@ -74,6 +76,41 @@ export class SchedulerService {
     if (!reviewCase) return false;
     const grant = this.grants.get(schedule.grant_id);
     if (!grant) return false;
+    const workspaceId = schedule.workspace_id ?? proposal.workspace_id ?? reviewCase.workspace_id ?? null;
+    if (!workspaceId) {
+      this.schedules.cancel(schedule.id, '任务尚未绑定工作区', at);
+      this.proposals.setStatus(proposal.id, 'pending_review', at);
+      this.cases.setStatus(reviewCase.id, 'pending_review', at);
+      return false;
+    }
+    const workspace = this.workspaceService.detail({ id: 'system', role: 'admin', name: 'system', email: 'system@local' }, workspaceId);
+    if (workspace.status !== 'active') {
+      this.grants.revoke(grant.id);
+      this.schedules.cancel(schedule.id, '目标工作区未启用', at);
+      this.proposals.setStatus(proposal.id, 'pending_review', at);
+      this.cases.setStatus(reviewCase.id, 'pending_review', at);
+      this.audit.record({
+        entityType: 'review_case', entityId: reviewCase.id, action: 'workspace.execution_blocked', actor: 'system',
+        before: { workspace_status: workspace.status }, after: { status: 'pending_review' },
+        traceId: `schedule:${schedule.id}`, at, workspaceId,
+      });
+      return false;
+    }
+    const repositoryId = schedule.repository_id ?? proposal.repository_id ?? reviewCase.repository_id ?? null;
+    const bindingHash = this.workspaceService.workspaceBindingHash(workspaceId, repositoryId);
+    if (grant.workspace_binding_hash !== bindingHash || proposal.workspace_binding_hash !== bindingHash) {
+      this.grants.revoke(grant.id);
+      this.schedules.cancel(schedule.id, '工作区绑定已变化', at);
+      this.proposals.setStatus(proposal.id, 'pending_review', at);
+      this.cases.setStatus(reviewCase.id, 'pending_review', at);
+      this.audit.record({
+        entityType: 'review_case', entityId: reviewCase.id, action: 'workspace.binding_invalidated', actor: 'system',
+        before: { grant_hash: grant.workspace_binding_hash, proposal_hash: proposal.workspace_binding_hash },
+        after: { status: 'pending_review', current_hash: bindingHash },
+        traceId: `schedule:${schedule.id}`, at, workspaceId,
+      });
+      return false;
+    }
 
     if (grant.status !== 'active' || grant.consumed_at) {
       this.schedules.cancel(schedule.id, '审批授权已失效', at);
@@ -82,7 +119,7 @@ export class SchedulerService {
       this.audit.record({
         entityType: 'review_case', entityId: reviewCase.id, action: 'approval.invalidated', actor: 'system',
         before: { grant_status: grant.status }, after: { status: 'pending_review', reason: '审批授权已失效' },
-        traceId: `schedule:${schedule.id}`, at,
+        traceId: `schedule:${schedule.id}`, at, workspaceId,
       });
       return false;
     }
@@ -93,7 +130,7 @@ export class SchedulerService {
       this.cases.setStatus(reviewCase.id, 'failed', at);
       this.audit.record({
         entityType: 'review_case', entityId: reviewCase.id, action: 'approval.expired', actor: 'system',
-        before: { expires_at: grant.expires_at }, after: { status: 'failed' }, traceId: `schedule:${schedule.id}`, at,
+        before: { expires_at: grant.expires_at }, after: { status: 'failed' }, traceId: `schedule:${schedule.id}`, at, workspaceId,
       });
       return false;
     }
@@ -105,7 +142,7 @@ export class SchedulerService {
       this.audit.record({
         entityType: 'review_case', entityId: reviewCase.id, action: 'approval.invalidated', actor: 'system',
         before: { requirement_hash: grant.requirement_hash, scope_hash: grant.scope_hash },
-        after: { status: 'pending_review', reason: '需求或执行范围已变化' }, traceId: `schedule:${schedule.id}`, at,
+        after: { status: 'pending_review', reason: '需求或执行范围已变化' }, traceId: `schedule:${schedule.id}`, at, workspaceId,
       });
       return false;
     }
@@ -119,7 +156,7 @@ export class SchedulerService {
       idempotencyKey: `execute:${executionId}`,
       payload: {
         proposal_id: proposal.id, grant_id: grant.id, requirement_hash: reviewCase.requirement_hash,
-        scope_hash: proposal.scope_hash, execution_id: executionId,
+        scope_hash: proposal.scope_hash, workspace_binding_hash: bindingHash, execution_id: executionId,
         trace_id: `schedule:${schedule.id}`, idempotency_key: `execute:${executionId}`,
       },
       maxAttempts: this.maxAttempts, createdAt: at,
@@ -127,7 +164,7 @@ export class SchedulerService {
     this.audit.record({
       entityType: 'review_case', entityId: reviewCase.id, action: 'execution.started', actor: 'system',
       before: { status: 'scheduled' }, after: { status: 'executing', execution_id: executionId },
-      traceId: `schedule:${schedule.id}`, at,
+      traceId: `schedule:${schedule.id}`, at, workspaceId,
     });
     return true;
   }

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dsh.local/schemas/workspace.schema.json",
+  "title": "Workspace",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "slug", "description", "description_version", "status", "created_at", "updated_at"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "slug": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "description": { "type": "string" },
+    "description_version": { "type": "integer", "minimum": 1 },
+    "description_hash": { "anyOf": [{ "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }, { "type": "null" }] },
+    "status": { "enum": ["onboarding", "active", "disabled", "error"] },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}

@@ -5,6 +5,7 @@ import { LockOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { AuditEventRecord } from '@gatehouse/contract';
 import type { AuditResponse } from '../../types/api';
 import { useApiData } from '../../hooks/useApiData';
+import { useWorkspace } from '../../hooks/useWorkspace';
 import { actionLabels, formatFullDate } from '../../lib/format';
 import { Badge, ErrorState, PageHeader } from '../../components/ui';
 
@@ -16,13 +17,15 @@ const actionOptions = [
 ];
 
 export function AuditPage() {
+  const { currentId } = useWorkspace();
+  const workspaceId = currentId ?? '';
   const [action, setAction] = useState<string>();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const params = new URLSearchParams({ page: String(page), page_size: '25' });
+  const params = new URLSearchParams({ workspace_id: workspaceId, page: String(page), page_size: '25' });
   if (action) params.set('action', action);
   if (search) params.set('entity_id', search);
-  const path = useMemo(() => `/api/audit?${params.toString()}`, [action, search, page]);
+  const path = useMemo(() => `/api/audit?${params.toString()}`, [action, search, page, workspaceId]);
   const { data, loading, error, reload } = useApiData<AuditResponse>(path);
   const columns: ColumnsType<AuditEventRecord> = [
     { title: 'NO.', key: 'index', width: 58, render: (_, __, index) => <span className="index-no">{String((page - 1) * 25 + index + 1).padStart(3, '0')}</span> },

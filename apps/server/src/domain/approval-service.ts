@@ -12,6 +12,7 @@ import { DomainError, NotFoundError } from './errors.js';
 import { newId, nowIso, stableHash } from './utils.js';
 import { requireRole } from '../auth.js';
 import type { PluginDecisionRequest } from '../plugin/plugin-client.js';
+import type { WorkspaceService } from './workspace-service.js';
 
 export interface DecisionResult {
   decision: ReviewDecisionRecord;
@@ -31,6 +32,7 @@ export class ApprovalService {
     private readonly outbox: OutboxRepository,
     private readonly audit: AuditService,
     private readonly pluginMaxAttempts: number,
+    private readonly workspaces: WorkspaceService,
   ) {}
 
   decide(input: {
@@ -58,6 +60,27 @@ export class ApprovalService {
     if (!proposal) throw new NotFoundError('提案', input.proposalId);
     const reviewCase = this.cases.get(proposal.review_case_id);
     if (!reviewCase) throw new NotFoundError('复核需求', proposal.review_case_id);
+    const workspaceId = proposal.workspace_id ?? reviewCase.workspace_id ?? null;
+    if (!workspaceId) {
+      throw new DomainError('WORKSPACE_REQUIRED', '该提案尚未绑定工作区', '先由复核人指定目标工作区和仓库', 409);
+    }
+    this.workspaces.requireAccess(input.user, workspaceId);
+    const workspace = this.workspaces.detail(input.user, workspaceId);
+    if (workspace.status === 'disabled') {
+      throw new DomainError('WORKSPACE_DISABLED', '目标工作区已停用', '启用工作区或改派到其他工作区', 409);
+    }
+    const repositoryId = proposal.repository_id ?? reviewCase.repository_id ?? null;
+    const repository = repositoryId ? this.workspaces.repositoryForEvent(workspaceId, repositoryId) : null;
+    if (repositoryId && !repository) {
+      throw new DomainError('REPOSITORY_BINDING_INVALID', '提案绑定的仓库不属于目标工作区', '重新选择目标工作区后审批', 409);
+    }
+    if (repository && repository.status !== 'ready') {
+      throw new DomainError('REPOSITORY_NOT_READY', '目标仓库尚未完成描述确认或健康检查', '完成仓库接入流程后再审批', 409);
+    }
+    const workspaceBindingHash = this.workspaces.workspaceBindingHash(workspaceId, repositoryId);
+    if (proposal.workspace_binding_hash && proposal.workspace_binding_hash !== workspaceBindingHash) {
+      throw new DomainError('WORKSPACE_BINDING_CHANGED', '工作区或仓库绑定已变化，旧提案不能继续审批', '刷新提案并重新评估', 409);
+    }
     if (proposal.status !== 'pending_review') {
       throw new DomainError('PROPOSAL_NOT_REVIEWABLE', `当前提案状态为 ${proposal.status}，不能再次审批`, '刷新详情并确认当前状态', 409);
     }
@@ -102,7 +125,7 @@ export class ApprovalService {
       this.audit.record({
         entityType: 'review_case', entityId: reviewCase.id, action: 'decision.recorded', actor: input.user.name,
         before: { status: proposal.status }, after: { status: nextStatus, decision: input.decision.decision, comment: input.decision.comment },
-        traceId: input.traceId, at,
+        traceId: input.traceId, at, workspaceId,
       });
 
       if (input.decision.decision === 'approve') {
@@ -115,6 +138,7 @@ export class ApprovalService {
         const grant = this.grants.activate({
           id: grantId, proposal_id: proposal.id, reviewer: input.user.name,
           requirement_hash: reviewCase.requirement_hash, scope_hash: proposal.scope_hash,
+          workspace_binding_hash: workspaceBindingHash,
           approved_at: at, schedule_at: scheduleAt, expires_at: expiresAt, consumed_at: null, status: 'active',
         });
         approvedGrantId = grant.id;
@@ -122,18 +146,19 @@ export class ApprovalService {
           id: existingSchedule?.id ?? newId('schedule'), proposal_id: proposal.id, grant_id: grant.id,
           schedule_at: scheduleAt, expires_at: expiresAt, status: 'scheduled', approval_synced_at: null,
           attempts: 0, max_attempts: this.pluginMaxAttempts, last_error: null, execution_id: null, pr_url: null,
+          workspace_id: workspaceId, repository_id: repositoryId,
           created_at: existingSchedule?.created_at ?? at, updated_at: at,
         });
         this.audit.record({
           entityType: 'review_case', entityId: reviewCase.id, action: existingGrant ? 'grant.reactivated' : 'grant.created', actor: input.user.name,
           before: existingGrant ? { status: existingGrant.status } : null,
           after: { grant_id: grant.id, schedule_at: scheduleAt, expires_at: expiresAt },
-          traceId: input.traceId, at,
+          traceId: input.traceId, at, workspaceId,
         });
         this.audit.record({
           entityType: 'review_case', entityId: reviewCase.id, action: existingSchedule ? 'schedule.reapproved' : 'schedule.created', actor: input.user.name,
           before: existingSchedule ? { status: existingSchedule.status } : null,
-          after: { schedule_at: scheduleAt, status: 'scheduled' }, traceId: input.traceId, at,
+          after: { schedule_at: scheduleAt, status: 'scheduled' }, traceId: input.traceId, at, workspaceId,
         });
       }
 
@@ -145,6 +170,7 @@ export class ApprovalService {
         ...(input.decision.decision === 'approve' && approvedGrantId ? { grant_id: approvedGrantId } : {}),
         requirement_hash: reviewCase.requirement_hash,
         scope_hash: proposal.scope_hash,
+        workspace_binding_hash: workspaceBindingHash,
         ...(input.decision.decision === 'approve' ? { schedule_at: scheduleAt, expires_at: expiresAt } : {}),
         trace_id: input.traceId,
         idempotency_key: input.idempotencyKey,

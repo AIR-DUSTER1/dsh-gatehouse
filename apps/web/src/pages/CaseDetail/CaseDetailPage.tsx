@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   Alert, App as AntdApp, Avatar, Button, Card, Checkbox, Col, DatePicker, Descriptions, Divider, Flex, Form,
-  Empty, Input, Modal, Row, Space, Tag, Timeline, Typography,
+  Empty, Input, Modal, Row, Select, Space, Tag, Timeline, Typography,
 } from 'antd';
 import {
   ArrowLeftOutlined, CalendarOutlined, CheckCircleOutlined, CloseCircleOutlined, CodeOutlined, FileTextOutlined,
@@ -13,6 +13,7 @@ import type { DecisionType, ReviewCaseDetail } from '@gatehouse/contract';
 import { api, ApiError } from '../../api/client';
 import { useApiData } from '../../hooks/useApiData';
 import { useAuth } from '../../hooks/useAuth';
+import { useWorkspace, workspacePath } from '../../hooks/useWorkspace';
 import { actionLabels, decisionLabels, formatFullDate, riskLabels, shortHash, sourceLabel, statusExplain, statusLabels } from '../../lib/format';
 import { Avatar as PersonAvatar, ErrorState, LoadingState, RiskBadge, SourceBadge, StatusBadge } from '../../components/ui';
 import type { DecisionResponse } from '../../types/api';
@@ -24,12 +25,19 @@ interface DecisionForm { comment: string; risk_confirmed: boolean; schedule_at?:
 export function CaseDetailPage() {
   const { id = '' } = useParams();
   const { user } = useAuth();
+  const { currentId, workspaces } = useWorkspace();
+  const workspaceId = currentId ?? '';
   const { message } = AntdApp.useApp();
   const [form] = Form.useForm<DecisionForm>();
   const { data, loading, error, reload } = useApiData<ReviewCaseDetail>(`/api/review-cases/${id}`);
   const [action, setAction] = useState<DecisionType | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [routingOpen, setRoutingOpen] = useState(false);
+  const [routingWorkspaceId, setRoutingWorkspaceId] = useState('');
+  const [routingRepositoryId, setRoutingRepositoryId] = useState<string | null>(null);
+  const [routingReason, setRoutingReason] = useState('');
+  const [routingSaving, setRoutingSaving] = useState(false);
   const proposal = data?.proposals[0] ?? null;
   const latestDecision = data?.decisions[0] ?? null;
   const isReviewer = user?.role === 'reviewer' || user?.role === 'admin';
@@ -69,7 +77,7 @@ export function CaseDetailPage() {
   return (
     <div className="page-stack detail-page">
       <Flex justify="space-between" align="center">
-        <Link to="/review"><Button type="text" icon={<ArrowLeftOutlined />}>返回复核中心</Button></Link>
+        <Link to={workspacePath(workspaceId, 'review')}><Button type="text" icon={<ArrowLeftOutlined />}>返回复核中心</Button></Link>
         <span className="case-no">CASE / {data.review_case.id}</span>
       </Flex>
 
@@ -125,6 +133,24 @@ export function CaseDetailPage() {
               <Text type="secondary">Scope hash</Text><br /><Text code copyable={{ text: proposal.scope_hash }}>{shortHash(proposal.scope_hash)}</Text>
             </Card>
 
+            <Card title="ROUTE / 工作区路由" variant="borderless" extra={<Tag>{proposal.workspace_id ? '已绑定' : '待人工选择'}</Tag>}>
+              {(() => {
+                const targetWorkspace = workspaces.find(workspace => workspace.id === proposal.workspace_id);
+                const targetRepository = targetWorkspace?.repositories.find(repository => repository.id === proposal.repository_id);
+                return <Descriptions column={1} size="small" items={[
+                  { key: 'workspace', label: '目标工作区', children: targetWorkspace?.name ?? '尚未绑定' },
+                  { key: 'repository', label: '目标仓库', children: targetRepository ? <Text code>{targetRepository.repository_key}</Text> : '未指定' },
+                  { key: 'binding', label: '绑定哈希', children: proposal.workspace_binding_hash ? <Text code>{shortHash(proposal.workspace_binding_hash)}</Text> : '—' },
+                ]} />;
+              })()}
+              {isReviewer && proposal.status === 'pending_review' && <Button className="settings-save" onClick={() => {
+                setRoutingWorkspaceId(proposal.workspace_id ?? workspaces[0]?.id ?? '');
+                setRoutingRepositoryId(proposal.repository_id ?? workspaces.find(item => item.id === (proposal.workspace_id ?? workspaces[0]?.id))?.repositories[0]?.id ?? null);
+                setRoutingReason('复核人手动确认目标仓库');
+                setRoutingOpen(true);
+              }}>改派工作区</Button>}
+            </Card>
+
             <Card title={<Space><CodeOutlined />F / 影响文件</Space>} extra={<span className="mono-label">{proposal.impact_files.length} 个</span>} variant="borderless">
               {proposal.impact_files.length ? <Flex vertical gap={7}>{proposal.impact_files.map(file => <Text key={file} code copyable>{file}</Text>)}</Flex> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="未识别到文件级影响" />}
             </Card>
@@ -171,6 +197,32 @@ export function CaseDetailPage() {
           {formError && <Alert type="error" showIcon title={formError} />}
           <Divider />
           <Descriptions size="small" column={2} items={[{ key: 'requirement', label: '需求哈希', children: <Text code>{shortHash(data.review_case.requirement_hash)}</Text> }, { key: 'scope', label: '范围哈希', children: <Text code>{shortHash(proposal.scope_hash)}</Text> }]} />
+        </Form>
+      </Modal>
+
+      <Modal open={routingOpen} title="改派目标工作区" width={580} confirmLoading={routingSaving}
+        onCancel={() => setRoutingOpen(false)} okText="保存改派" onOk={() => {
+          if (!routingWorkspaceId) { message.error('请选择目标工作区'); return; }
+          if (routingReason.trim().length < 2) { message.error('请填写改派原因'); return; }
+          setRoutingSaving(true);
+          void api(`/api/proposals/${proposal.id}/reassign`, {
+            method: 'POST', body: JSON.stringify({ workspace_id: routingWorkspaceId, repository_id: routingRepositoryId, reason: routingReason.trim() }),
+          }).then(() => { message.success('工作区已改派，原授权已失效'); setRoutingOpen(false); reload(); })
+            .catch((reason: unknown) => message.error(reason instanceof ApiError ? reason.body.error.message : '改派失败'))
+            .finally(() => setRoutingSaving(false));
+        }} destroyOnHidden>
+        <Alert type="warning" showIcon title="改派会更新工作区绑定哈希；若已有批准，旧授权会立即失效并需要重新排期。" />
+        <Form layout="vertical" className="modal-form">
+          <Form.Item label="目标工作区" required>
+            <Select value={routingWorkspaceId || undefined} options={workspaces.filter(workspace => workspace.status !== 'disabled').map(workspace => ({ value: workspace.id, label: workspace.name }))}
+              onChange={(value) => { setRoutingWorkspaceId(value ?? ''); setRoutingRepositoryId(workspaces.find(workspace => workspace.id === value)?.repositories.find(repository => repository.status === 'ready')?.id ?? null); }} />
+          </Form.Item>
+          <Form.Item label="目标仓库">
+            <Select allowClear value={routingRepositoryId ?? undefined} placeholder="选择已完成接入的仓库"
+              options={(workspaces.find(workspace => workspace.id === routingWorkspaceId)?.repositories ?? []).map(repository => ({ value: repository.id, label: `${repository.repository_key} · ${repository.provider}`, disabled: repository.status !== 'ready' }))}
+              onChange={(value) => setRoutingRepositoryId(value ?? null)} />
+          </Form.Item>
+          <Form.Item label="改派原因" required><Input.TextArea rows={3} maxLength={500} showCount value={routingReason} onChange={event => setRoutingReason(event.target.value)} /></Form.Item>
         </Form>
       </Modal>
     </div>

@@ -106,6 +106,7 @@ export class OutboxDispatcher {
         this.audit.record({
           entityType: 'review_case', entityId: reviewCase.id, action: 'schedule.plugin_synced', actor: 'system',
           before: { approval_synced_at: null }, after: { approval_synced_at: at }, traceId: `outbox:${message.id}`, at,
+          workspaceId: schedule.workspace_id ?? proposal.workspace_id ?? reviewCase.workspace_id ?? null,
         });
       }
       return;
@@ -116,6 +117,7 @@ export class OutboxDispatcher {
         this.audit.record({
           entityType: 'review_case', entityId: reviewCase.id, action: 'schedule.reschedule_synced', actor: 'system',
           before: { approval_synced_at: null }, after: { approval_synced_at: at }, traceId: `outbox:${message.id}`, at,
+          workspaceId: schedule.workspace_id ?? proposal.workspace_id ?? reviewCase.workspace_id ?? null,
         });
       }
       return;
@@ -124,6 +126,7 @@ export class OutboxDispatcher {
       this.audit.record({
         entityType: 'review_case', entityId: reviewCase.id, action: 'schedule.withdraw_synced', actor: 'system',
         before: { grant_status: 'revoked' }, after: { synced: true }, traceId: `outbox:${message.id}`, at,
+        workspaceId: schedule?.workspace_id ?? proposal.workspace_id ?? reviewCase.workspace_id ?? null,
       });
       return;
     }
@@ -137,12 +140,14 @@ export class OutboxDispatcher {
           entityType: 'review_case', entityId: reviewCase.id, action: 'execution.finished', actor: 'dsh-superagent',
           before: { status: 'executing' }, after: { status: 'completed', execution_id: projection.executionId, pr_url: projection.prUrl },
           traceId: `outbox:${message.id}`, at,
+          workspaceId: schedule.workspace_id ?? proposal.workspace_id ?? reviewCase.workspace_id ?? null,
         });
       } else {
         this.audit.record({
           entityType: 'review_case', entityId: reviewCase.id, action: 'execution.dispatched', actor: 'system',
           before: { status: 'scheduled' }, after: { status: 'executing', execution_id: projection.executionId, ticket_id: projection.ticketId ?? null },
           traceId: `outbox:${message.id}`, at,
+          workspaceId: schedule.workspace_id ?? proposal.workspace_id ?? reviewCase.workspace_id ?? null,
         });
       }
     }
@@ -159,6 +164,7 @@ export class OutboxDispatcher {
       this.audit.record({
         entityType: 'review_case', entityId: reviewCase.id, action: 'plugin.reschedule.failed', actor: 'system',
         before: { approval_synced_at: null }, after: { reason, outbox_id: message.id }, traceId: `outbox:${message.id}`, at,
+        workspaceId: schedule.workspace_id ?? proposal.workspace_id ?? reviewCase.workspace_id ?? null,
       });
       return;
     }
@@ -167,6 +173,7 @@ export class OutboxDispatcher {
       this.audit.record({
         entityType: 'review_case', entityId: reviewCase.id, action: 'plugin.withdraw.failed', actor: 'system',
         before: { grant_status: 'revoked' }, after: { reason, outbox_id: message.id }, traceId: `outbox:${message.id}`, at,
+        workspaceId: schedule?.workspace_id ?? proposal.workspace_id ?? reviewCase.workspace_id ?? null,
       });
       return;
     }
@@ -180,6 +187,7 @@ export class OutboxDispatcher {
       entityType: 'review_case', entityId: reviewCase.id, action: 'plugin.sync.failed', actor: 'system',
       before: { status: proposal.status }, after: { status: 'failed', reason, outbox_id: message.id },
       traceId: `outbox:${message.id}`, at,
+      workspaceId: schedule?.workspace_id ?? proposal.workspace_id ?? reviewCase.workspace_id ?? null,
     });
   }
 }

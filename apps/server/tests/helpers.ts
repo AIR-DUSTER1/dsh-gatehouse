@@ -1,6 +1,6 @@
 import { randomUUID, createHash } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import type { ReviewCaseRecord, ProposalRecord } from '@gatehouse/contract';
+import type { ReviewCaseRecord, ProposalRecord, WorkspaceListItem } from '@gatehouse/contract';
 import { createApplication, type AppContext } from '../src/app.js';
 import { hashPassword } from '../src/auth.js';
 
@@ -9,6 +9,9 @@ export interface TestHarness {
   context: AppContext;
   reviewerToken: string;
   viewerToken: string;
+  adminToken: string;
+  workspaceId: string;
+  repositoryId: string;
   caseId: string;
   proposalId: string;
   login: (email: string, password?: string) => Promise<string>;
@@ -42,6 +45,10 @@ export async function createHarness(databasePath = ':memory:'): Promise<TestHarn
     context.users.create({ id: user.id, email: user.email, name: user.name, role: user.role, password_hash: hashPassword(user.password) });
   }
 
+  const admin = context.users.list().find((user) => user.role === 'admin')!;
+  const workspace = ensureTestWorkspace(context);
+  for (const user of context.users.list()) context.workspaceStore.addMember(workspace.id, user.id, now);
+
   const fixture = createReviewFixture(context, '陈晓', '测试需求：实现审批闭环');
   const login = async (email: string, password = 'test123') => {
     const response = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email, password } });
@@ -50,30 +57,79 @@ export async function createHarness(databasePath = ':memory:'): Promise<TestHarn
   };
   return {
     app, context, reviewerToken: await login('reviewer@test.local'), viewerToken: await login('viewer@test.local'),
+    adminToken: await (async () => {
+      const token = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email: admin.email, password: 'test-admin-password-123' } });
+      if (token.statusCode !== 200) throw new Error(`admin login failed: ${token.body}`);
+      return (token.json() as { token: string }).token;
+    })(),
+    workspaceId: workspace.id, repositoryId: workspace.repositories[0]!.id,
     caseId: fixture.case.id, proposalId: fixture.proposal.id, login,
   };
 }
 
-export function createReviewFixture(context: AppContext, requester: string, title: string, suffix = randomUUID()): { case: ReviewCaseRecord; proposal: ProposalRecord } {
+export function ensureTestWorkspace(context: AppContext): WorkspaceListItem {
+  const existing = context.workspaceService.defaultWorkspace();
+  if (existing) {
+    const item = context.workspaceService.list(context.users.list().find((user) => user.role === 'admin')!)
+      .find((workspace) => workspace.id === existing.id);
+    if (item) return item;
+  }
+  const admin = context.users.list().find((user) => user.role === 'admin')!;
+  const workspace = context.workspaceService.create({
+    name: '自动化测试工作区',
+    slug: `test-${randomUUID().slice(0, 8)}`,
+    description: '用于服务端自动化测试的隔离工作区',
+    repository: {
+      provider: 'github', repository_key: 'example/automation', api_base_url: 'https://api.github.com',
+      web_base_url: 'https://github.com/example/automation', clone_url: 'https://github.com/example/automation.git',
+      default_branch: 'main', credential_ref: '', custom_ca_ref: null,
+      observe: { issues: true, change_requests: true, comments: true, ci: true },
+    },
+  }, admin, 'test-workspace-create');
+  const repository = workspace.repositories[0]!;
+  context.workspaceService.confirmDescription(repository.id, {
+    short_description: '自动化测试仓库负责验证多工作区隔离、审批排期和执行投影流程。',
+    capabilities: ['工作区隔离', '审批排期', '执行投影'],
+    routing_keywords: ['测试', '工作区', '审批', '排期'],
+    exclusions: [],
+    confidence: 0.95,
+    source_fingerprint: `sha256:${'0'.repeat(64)}`,
+    generated_at: new Date().toISOString(),
+    model: 'test-model',
+  }, admin, 'test-workspace-description');
+  return context.workspaceService.detail(admin, workspace.id);
+}
+
+export function createReviewFixture(context: AppContext, requester: string, title: string, suffix = randomUUID(),
+  target?: { workspaceId: string; repositoryId?: string | null }): { case: ReviewCaseRecord; proposal: ProposalRecord } {
+  const admin = context.users.list().find((user) => user.role === 'admin')!;
+  const workspace = target
+    ? context.workspaceService.detail(admin, target.workspaceId)
+    : ensureTestWorkspace(context);
+  const repository = target?.repositoryId === null ? null
+    : workspace.repositories.find((item) => item.id === target?.repositoryId) ?? workspace.repositories[0] ?? null;
+  const workspaceBindingHash = context.workspaceService.workspaceBindingHash(workspace.id, repository?.id ?? null);
   const now = new Date().toISOString();
   const scope = [`实现 ${title}`, '补充自动化测试'];
   const requirement = `${title}：这是用于自动化验证的完整需求文本。`;
   const reviewCase: ReviewCaseRecord = {
     id: `case_${suffix}`, plugin_case_id: `plugin_case_${suffix}`, source: 'feishu', requester, title,
     requirement_text: requirement, requirement_hash: hash(requirement), status: 'pending_review', risk_level: 'medium',
-    source_context: '自动化测试事件', message_url: null, created_at: now, updated_at: now,
+    source_context: '自动化测试事件', message_url: null, workspace_id: workspace.id,
+    repository_id: repository?.id ?? null, routing_decision_id: null, created_at: now, updated_at: now,
   };
   const proposal: ProposalRecord = {
     id: `proposal_${suffix}`, review_case_id: reviewCase.id, assessment_revision: 1, summary: `建议按两个步骤完成 ${title}`,
     scope, scope_hash: hash(scope), rule_hits: ['touches-api'], impact_files: ['apps/server/src/app.ts'],
     test_plan: ['接口测试通过', '权限测试通过'], estimated_cost: '约 2 小时', risk: 'medium',
     risk_reason: '涉及审批状态流转。', status: 'pending_review', created_at: now, updated_at: now,
+    workspace_id: workspace.id, repository_id: repository?.id ?? null, workspace_binding_hash: workspaceBindingHash,
   };
   context.cases.create(reviewCase);
   context.proposals.create(proposal);
   context.audit.record({
     entityType: 'review_case', entityId: reviewCase.id, action: 'proposal.created', actor: 'dsh-superagent',
-    before: null, after: { proposal_id: proposal.id }, traceId: `fixture-${suffix}`, at: now,
+    before: null, after: { proposal_id: proposal.id }, traceId: `fixture-${suffix}`, at: now, workspaceId: workspace.id,
   });
   return { case: reviewCase, proposal };
 }

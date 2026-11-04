@@ -3,13 +3,16 @@ import { Alert, Button, Card, Col, Empty, Flex, Row, Space, Statistic, Typograph
 import { CheckCircleOutlined, ClockCircleOutlined, ExportOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons';
 import type { ScheduleResponse } from '../../types/api';
 import { useApiData } from '../../hooks/useApiData';
+import { useWorkspace, workspacePath } from '../../hooks/useWorkspace';
 import { formatFullDate, shortHash } from '../../lib/format';
 import { ErrorState, LoadingState, PageHeader, RiskBadge, StatusBadge } from '../../components/ui';
 
 const { Text, Title } = Typography;
 
 export function ExecutionPage() {
-  const { data, loading, error, reload } = useApiData<ScheduleResponse>('/api/schedule');
+  const { currentId } = useWorkspace();
+  const workspaceId = currentId ?? '';
+  const { data, loading, error, reload } = useApiData<ScheduleResponse>(`/api/schedule?workspace_id=${encodeURIComponent(workspaceId)}`);
   if (loading) return <LoadingState label="正在加载交付记录…" />;
   if (error || !data) return <ErrorState message={error?.message ?? '交付记录加载失败'} action={error?.body.error.action} onRetry={reload} />;
   const records = data.items.filter(item => ['completed', 'failed', 'executing'].includes(item.status));
@@ -33,14 +36,14 @@ export function ExecutionPage() {
             <Flex gap={14} align="flex-start" wrap>
               {item.status === 'completed' ? <CheckCircleOutlined className="result-icon success" /> : item.status === 'failed' ? <WarningOutlined className="result-icon danger" /> : <ClockCircleOutlined className="result-icon running" />}
               <div className="execution-copy">
-                <Space wrap><Link to={`/review/${item.review_case_id}`}><Title level={5}>{item.title}</Title></Link><StatusBadge status={item.status} /><RiskBadge risk={item.risk_level} /></Space>
+                <Space wrap><Link to={workspacePath(workspaceId, `review/${item.review_case_id}`)}><Title level={5}>{item.title}</Title></Link><StatusBadge status={item.status} /><RiskBadge risk={item.risk_level} /></Space>
                 <Text type="secondary">{item.proposal_summary}</Text>
                 <Space separator="·" wrap><Text type="secondary" className="small-text">Execution {shortHash(item.execution_id ?? '等待分配')}</Text><Text type="secondary" className="small-text">尝试 {item.attempts} / {item.max_attempts}</Text><Text type="secondary" className="small-text">{formatFullDate(item.updated_at)}</Text></Space>
                 {item.last_error && <Alert type="error" showIcon title={item.last_error} className="execution-error" />}
               </div>
               <Space className="execution-actions">
                 {item.pr_url && <a href={item.pr_url} target="_blank" rel="noreferrer"><Button icon={<ExportOutlined />}>查看 PR</Button></a>}
-                <Link to={`/review/${item.review_case_id}`}>审计详情</Link>
+                <Link to={workspacePath(workspaceId, `review/${item.review_case_id}`)}>审计详情</Link>
               </Space>
             </Flex>
           </Card>

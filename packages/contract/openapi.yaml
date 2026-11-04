@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: dsh-superagent Console API
-  version: 1.0.0
+  version: 0.2.0
   description: 人工复核、审批、排期、执行投影与审计 API。
 servers:
   - url: http://127.0.0.1:8787
@@ -64,6 +64,53 @@ components:
       additionalProperties: false
       properties:
         reason: { type: string, maxLength: 500, default: '' }
+    RepositoryConfigInput:
+      type: object
+      additionalProperties: false
+      required: [provider, repository_key, web_base_url, clone_url]
+      properties:
+        provider: { enum: [github, gitlab, gitea, bitbucket, generic] }
+        repository_key: { type: string }
+        api_base_url: { type: [string, 'null'], format: uri }
+        web_base_url: { type: string, format: uri }
+        clone_url: { type: string }
+        default_branch: { type: string, default: main }
+        credential_ref: { type: string, description: '只允许 env:/file: 引用，不得填写明文密钥' }
+        custom_ca_ref: { type: [string, 'null'] }
+        observe:
+          type: object
+          properties:
+            issues: { type: boolean }
+            change_requests: { type: boolean }
+            comments: { type: boolean }
+            ci: { type: boolean }
+    WorkspaceCreateInput:
+      type: object
+      additionalProperties: false
+      required: [name, slug]
+      properties:
+        name: { type: string }
+        slug: { type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' }
+        description: { type: string }
+        repository: { $ref: '#/components/schemas/RepositoryConfigInput' }
+    RoutingReassignInput:
+      type: object
+      additionalProperties: false
+      required: [workspace_id, reason]
+      properties:
+        workspace_id: { type: string }
+        repository_id: { type: [string, 'null'] }
+        reason: { type: string, maxLength: 500 }
+    RepositoryDescriptionInput:
+      type: object
+      additionalProperties: false
+      required: [short_description, capabilities, routing_keywords, confidence]
+      properties:
+        short_description: { type: string, minLength: 20, maxLength: 1200 }
+        capabilities: { type: array, minItems: 1, items: { type: string } }
+        routing_keywords: { type: array, minItems: 3, items: { type: string } }
+        exclusions: { type: array, items: { type: string } }
+        confidence: { type: number, minimum: 0, maximum: 1 }
 paths:
   /health:
     get:
@@ -121,9 +168,10 @@ paths:
     get:
       summary: 复核队列
       parameters:
+        - { in: query, name: workspace_id, required: true, schema: { type: string } }
         - { in: query, name: status, schema: { type: string } }
         - { in: query, name: risk, schema: { type: string } }
-        - { in: query, name: source, schema: { enum: [feishu, github] } }
+        - { in: query, name: source, schema: { enum: [feishu, github, gitlab, gitea, webhook, manual] } }
         - { in: query, name: search, schema: { type: string } }
         - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
         - { in: query, name: page_size, schema: { type: integer, maximum: 100, default: 20 } }
@@ -160,11 +208,13 @@ paths:
   /api/dashboard:
     get:
       summary: 统计指标
+      parameters: [{ in: query, name: workspace_id, required: true, schema: { type: string } }]
       responses:
         '200': { description: 工作台统计 }
   /api/schedule:
     get:
       summary: 排期列表与并发指标
+      parameters: [{ in: query, name: workspace_id, required: true, schema: { type: string } }]
       responses:
         '200': { description: 排期列表 }
   /api/schedule/{id}/pause:
@@ -211,6 +261,7 @@ paths:
     get:
       summary: 审计查询
       parameters:
+        - { in: query, name: workspace_id, required: true, schema: { type: string } }
         - { in: query, name: entity_type, schema: { type: string } }
         - { in: query, name: entity_id, schema: { type: string } }
         - { in: query, name: action, schema: { type: string } }
@@ -228,12 +279,13 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [max_concurrency, plugin_mode, plugin_base_url, monitored_repository, session_ttl_seconds, users, pending_outbox]
+                required: [max_concurrency, plugin_mode, plugin_base_url, monitored_repository, monitored_repositories, session_ttl_seconds, users, pending_outbox]
                 properties:
                   max_concurrency: { type: integer }
                   plugin_mode: { type: string, enum: [mock, http] }
                   plugin_base_url: { type: string }
                   monitored_repository: { type: string, nullable: true, example: AIR-DUSTER1/dsh-superagent-review }
+                  monitored_repositories: { type: array, items: { type: object } }
                   session_ttl_seconds: { type: integer }
                   users: { type: array, items: { type: object } }
                   pending_outbox: { type: integer }
@@ -251,3 +303,121 @@ paths:
       responses:
         '200': { description: 已保存 }
         '403': { description: 非管理员 }
+  /api/workspaces:
+    get:
+      summary: 当前用户可访问的工作区
+      responses:
+        '200': { description: 工作区、仓库、绑定与进行中任务数 }
+    post:
+      summary: 新建工作区并可选接入仓库（admin）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WorkspaceCreateInput' }
+      responses:
+        '200': { description: 工作区已创建 }
+        '400': { description: 地址、凭据引用或配置校验失败 }
+        '403': { description: 非管理员 }
+  /api/workspaces/{id}:
+    get:
+      summary: 工作区详情
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: 工作区详情 }
+        '403': { description: 非工作区成员 }
+    put:
+      summary: 修改工作区名称或说明（admin）
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: 已更新 }
+  /api/workspaces/{id}/disable:
+    post:
+      summary: 停用工作区并撤回未开始排期（admin）
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: 已停用 }
+  /api/workspaces/{id}/repositories:
+    post:
+      summary: 为工作区添加仓库（admin）
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RepositoryConfigInput' }
+      responses:
+        '200': { description: 仓库已添加 }
+  /api/repositories/{id}/validate:
+    post:
+      summary: 只读检查仓库连通性和权限
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: Provider 元数据、README 摘要和权限结果 }
+  /api/repositories/{id}/describe:
+    post:
+      summary: 使用 DSH 当前模型生成仓库描述建议
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: 描述建议；管理员确认前不会保存 }
+  /api/repositories/{id}/description:
+    put:
+      summary: 确认仓库描述并生成新版本
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RepositoryDescriptionInput' }
+      responses:
+        '200': { description: 已确认；旧 Grant 已失效 }
+  /api/workspaces/sync:
+    post:
+      summary: 将全部工作区配置同步到 dsh-superagent（admin）
+      responses:
+        '200': { description: 配置版本、哈希与同步数量 }
+  /api/workspaces/{id}/health:
+    get:
+      summary: 工作区仓库和 Source 绑定健康状态
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: 健康状态 }
+  /api/workspaces/{id}/members:
+    get:
+      summary: 工作区成员（admin）
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: 成员列表 }
+  /api/workspaces/{id}/members/{userId}:
+    put:
+      summary: 添加工作区成员（admin）
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { in: path, name: userId, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 已添加 }
+    delete:
+      summary: 移除工作区成员（admin）
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { in: path, name: userId, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 已移除 }
+  /api/proposals/{id}/reassign:
+    post:
+      summary: 改派目标工作区并吊销旧 Grant
+      parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoutingReassignInput' }
+      responses:
+        '200': { description: 已改派 }
+        '409': { description: 执行已开始或目标仓库未就绪 }
+  /api/analytics/overview:
+    get:
+      summary: 全部工作区全局统计
+      parameters: [{ in: query, name: range, schema: { enum: [7d, 30d, 90d], default: 30d } }]
+      responses:
+        '200': { description: 指标、趋势、分布、工作区对账和最近失败 }

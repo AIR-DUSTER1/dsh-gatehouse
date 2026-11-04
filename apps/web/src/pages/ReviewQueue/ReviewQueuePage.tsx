@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Button, Card, Flex, Input, Select, Space, Table, Tabs, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons';
 import type { ReviewQueueItem } from '@gatehouse/contract';
 import type { ReviewQueueResponse } from '../../types/api';
 import { useApiData } from '../../hooks/useApiData';
+import { useWorkspace, workspacePath } from '../../hooks/useWorkspace';
 import { formatDate, sourceLabel } from '../../lib/format';
 import { Avatar, ErrorState, PageHeader, RiskBadge, SourceBadge, StatusBadge } from '../../components/ui';
 
@@ -15,30 +17,32 @@ const statusTabs = [
 ];
 
 export function ReviewQueuePage() {
+  const { currentId } = useWorkspace();
+  const workspaceId = currentId ?? '';
   const [status, setStatus] = useState('pending_review');
   const [risk, setRisk] = useState<string>();
   const [source, setSource] = useState<string>();
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const params = new URLSearchParams({ page: String(page), page_size: '12' });
+  const params = new URLSearchParams({ workspace_id: workspaceId, page: String(page), page_size: '12' });
   if (status) params.set('status', status);
   if (risk) params.set('risk', risk);
   if (source) params.set('source', source);
   if (search) params.set('search', search);
-  const path = useMemo(() => `/api/review-cases?${params.toString()}`, [status, risk, source, search, page]);
+  const path = useMemo(() => `/api/review-cases?${params.toString()}`, [status, risk, source, search, page, workspaceId]);
   const { data, loading, error, reload } = useApiData<ReviewQueueResponse>(path);
 
   const columns: ColumnsType<ReviewQueueItem> = [
     { title: 'NO.', key: 'index', width: 58, render: (_, __, index) => <span className="index-no">{String((page - 1) * (data?.page_size ?? 12) + index + 1).padStart(3, '0')}</span> },
-    { title: '需求', dataIndex: 'title', width: 360, render: (_, item) => <div className="table-title"><a href={`/review/${item.id}`}>{item.title}</a><Text type="secondary" ellipsis>{item.latest_proposal_summary}</Text></div> },
+    { title: '需求', dataIndex: 'title', width: 360, render: (_, item) => <div className="table-title"><Link to={workspacePath(workspaceId, `review/${item.id}`)}>{item.title}</Link><Text type="secondary" ellipsis>{item.latest_proposal_summary}</Text></div> },
     { title: '来源', dataIndex: 'source', width: 96, render: value => <SourceBadge source={value} /> },
     { title: '提出人', dataIndex: 'requester', width: 120, render: value => <Space><Avatar name={value} size="sm" /><Text>{value}</Text></Space> },
     { title: '风险', dataIndex: 'risk_level', width: 96, render: value => <RiskBadge risk={value} /> },
     { title: '规则命中', dataIndex: 'rule_hits', width: 200, render: value => <Space size={[4, 4]} wrap>{value.slice(0, 2).map((rule: string) => <Tag key={rule}>{rule}</Tag>)}{value.length > 2 && <Tag>+{value.length - 2}</Tag>}</Space> },
     { title: '状态', dataIndex: 'status', width: 110, render: value => <StatusBadge status={value} /> },
     { title: '创建时间', dataIndex: 'created_at', width: 130, render: value => <Text type="secondary" className="small-text">{formatDate(value)}</Text> },
-    { title: '', key: 'actions', width: 80, render: (_, item) => <Button type="link" href={`/review/${item.id}`}>详情</Button> },
+    { title: '', key: 'actions', width: 80, render: (_, item) => <Link to={workspacePath(workspaceId, `review/${item.id}`)}><Button type="link">详情</Button></Link> },
   ];
 
   return (
@@ -50,7 +54,7 @@ export function ReviewQueuePage() {
         <Flex gap={10} wrap>
           <Input.Search allowClear placeholder="搜索标题、提出人或需求内容" prefix={<SearchOutlined />} value={searchInput} onChange={event => setSearchInput(event.target.value)} onSearch={value => { setSearch(value.trim()); setPage(1); }} style={{ width: 340 }} />
           <Select allowClear placeholder="全部风险" value={risk} onChange={value => { setRisk(value); setPage(1); }} style={{ width: 130 }} options={[{ value: 'critical', label: '极高风险' }, { value: 'high', label: '高风险' }, { value: 'medium', label: '中风险' }, { value: 'low', label: '低风险' }]} />
-          <Select allowClear placeholder="全部来源" value={source} onChange={value => { setSource(value); setPage(1); }} style={{ width: 130 }} options={[{ value: 'feishu', label: '飞书' }, { value: 'github', label: 'GitHub' }]} />
+          <Select allowClear placeholder="全部来源" value={source} onChange={value => { setSource(value); setPage(1); }} style={{ width: 130 }} options={[{ value: 'feishu', label: '飞书' }, { value: 'github', label: 'GitHub' }, { value: 'gitlab', label: 'GitLab' }, { value: 'gitea', label: 'Gitea' }, { value: 'webhook', label: 'Webhook' }, { value: 'manual', label: '人工录入' }]} />
           <Text type="secondary" className="filter-count">共 {data?.total ?? 0} 条</Text>
         </Flex>
       </Card>
@@ -65,7 +69,7 @@ export function ReviewQueuePage() {
           locale={{ emptyText: '暂无符合条件的需求' }}
         />
       </Card>
-      <Text type="secondary" className="sr-only">来源：{sourceLabel('feishu')} / {sourceLabel('github')}</Text>
+      <Text type="secondary" className="sr-only">来源：{sourceLabel('feishu')} / {sourceLabel('github')} / {sourceLabel('gitlab')} / {sourceLabel('gitea')}</Text>
     </div>
   );
 }

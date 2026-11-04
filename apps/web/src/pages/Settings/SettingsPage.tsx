@@ -42,13 +42,13 @@ export function SettingsPage() {
 
   return (
     <div className="page-stack">
-      <PageHeader eyebrow="SEC.06 / SYSTEM" title="系统设置" description="配置执行器连接、调度并发与项目成员权限。敏感密钥只通过环境变量注入。" actions={<Button icon={<ReloadOutlined />} onClick={reload}>刷新</Button>} />
+      <PageHeader eyebrow="SYSTEM / SETTINGS" title="系统设置" description="配置执行器连接、调度并发与项目成员权限。仓库和工作区在独立控制面管理。" actions={<Space><Button href="/workspaces">工作区与仓库</Button><Button icon={<ReloadOutlined />} onClick={reload}>刷新</Button></Space>} />
       <Row gutter={[14, 14]}>
         <Col xs={24} xl={12}>
           <Card variant="borderless" title={<Space><ApiOutlined />dsh-superagent 连接</Space>} extra={<Tag color="green">已连接</Tag>}>
             <Descriptions column={1} size="small" items={[
               { key: 'mode', label: '连接模式', children: <Text code>{data.plugin_mode === 'mock' ? 'mock adapter（本地演示）' : 'HTTP + HMAC'}</Text> },
-              { key: 'repository', label: '监听仓库', children: data.monitored_repository ? <Text code>{data.monitored_repository}</Text> : <Text type="secondary">未配置</Text> },
+              { key: 'repository', label: '监听仓库', children: data.monitored_repositories.length ? <Space wrap>{data.monitored_repositories.map(repository => <Tag key={`${repository.workspace_id}:${repository.repository_key}`}>{repository.workspace_name} · {repository.repository_key}</Tag>)}</Space> : <Text type="secondary">未配置</Text> },
               { key: 'url', label: '执行器地址', children: <Text code>{data.plugin_base_url}</Text> },
               { key: 'outbox', label: '待重试消息', children: `${data.pending_outbox} 条` },
               { key: 'auth', label: '认证方式', children: 'HMAC-SHA256 · timestamp · nonce' },

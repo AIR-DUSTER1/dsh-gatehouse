@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Alert, Avatar as AntAvatar, Empty, Flex, Skeleton, Typography, Modal as AntModal } from 'antd';
-import type { CaseStatus, RiskLevel, ScheduleStatus } from '@gatehouse/contract';
-import { riskLabels, statusLabels } from '../lib/format';
+import type { CaseStatus, RiskLevel, ScheduleStatus, Source } from '@gatehouse/contract';
+import { riskLabels, sourceLabels, statusLabels } from '../lib/format';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -25,8 +25,8 @@ export function RiskBadge({ risk }: { risk: RiskLevel; subtle?: boolean }) {
   return <Badge tone={riskTones[risk]}>{riskLabels[risk]}</Badge>;
 }
 
-export function SourceBadge({ source }: { source: 'feishu' | 'github' }) {
-  return <Badge tone={source === 'feishu' ? 'ink' : 'neutral'}>{source === 'feishu' ? '飞书' : 'GitHub'}</Badge>;
+export function SourceBadge({ source }: { source: Source }) {
+  return <Badge tone={source === 'feishu' ? 'ink' : source === 'manual' ? 'warn' : 'neutral'}>{sourceLabels[source]}</Badge>;
 }
 
 export function PageHeader({ eyebrow, title, description, actions }: { eyebrow?: string; title: string; description?: string; actions?: ReactNode }) {

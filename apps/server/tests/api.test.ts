@@ -112,11 +112,49 @@ describe('console API', () => {
     expect(second.statusCode).toBe(200);
     expect(second.json()).toMatchObject({ duplicate: true });
 
-    const list = await h.app.inject({ method: 'GET', url: '/api/review-cases?page=1&page_size=20', headers: { authorization: `Bearer ${h.reviewerToken}` } });
+    const list = await h.app.inject({ method: 'GET', url: `/api/review-cases?workspace_id=${h.workspaceId}&page=1&page_size=20`, headers: { authorization: `Bearer ${h.reviewerToken}` } });
     expect((list.json() as { items: Array<{ id: string }> }).items.some((item) => item.id === 'case_evt1')).toBe(true);
 
     const invalid = await h.app.inject({ method: 'POST', url: '/api/plugin/events', headers: { 'x-timestamp': timestamp, 'x-nonce': randomUUID(), 'x-signature': '00'.repeat(32) }, payload: pluginEvent('evt_bad', 'bad') });
     expect(invalid.statusCode).toBe(401);
+  });
+
+  it('ingests a v2 proposal with workspace and repository routing evidence', async () => {
+    const h = await harness();
+    const suffix = randomUUID();
+    const now = new Date().toISOString();
+    const requirement = '需要新增账务导出接口并隔离到当前工作区';
+    const scope = ['实现账务导出接口', '补充工作区隔离测试'];
+    const hash = (value: unknown) => `sha256:${createHash('sha256').update(JSON.stringify(value)).digest('hex')}`;
+    const workspaceBindingHash = h.context.workspaceService.workspaceBindingHash(h.workspaceId, h.repositoryId)!;
+    const routingId = `routing_${suffix}`;
+    const body: PluginEventEnvelope = {
+      version: '2.0', event_id: `evt_v2_${suffix}`, event_type: 'proposal.created', occurred_at: now,
+      trace_id: `trace_v2_${suffix}`,
+      data: {
+        workspace_id: h.workspaceId, repository_id: h.repositoryId, workspace_binding_hash: workspaceBindingHash,
+        routing_decision: { id: routingId, workspace_id: h.workspaceId, repository_id: h.repositoryId,
+          source: 'github', mode: 'native', confidence: 1, reason: '原生仓库事件', candidates: [], requires_human: false,
+          overridden_by: null, created_at: now },
+        case: { id: `case_v2_${suffix}`, plugin_case_id: `plugin_v2_${suffix}`, source: 'github', requester: '账务复核人',
+          title: '账务导出接口', requirement_text: requirement, requirement_hash: hash(requirement), status: 'pending_review',
+          risk_level: 'medium', source_context: 'GitHub Issue #12', message_url: null, created_at: now, updated_at: now },
+        proposal: { id: `proposal_v2_${suffix}`, review_case_id: `case_v2_${suffix}`, assessment_revision: 1,
+          summary: '新增账务导出接口', scope, scope_hash: hash(scope), rule_hits: ['touches-api'],
+          impact_files: ['apps/server/src/app.ts'], test_plan: ['运行工作区隔离测试'], estimated_cost: '约 2 小时',
+          risk: 'medium', risk_reason: '涉及导出契约', status: 'pending_review', created_at: now, updated_at: now },
+      },
+    };
+    const timestamp = String(Date.now());
+    const nonce = randomUUID();
+    const response = await h.app.inject({ method: 'POST', url: '/api/plugin/events',
+      headers: { 'x-timestamp': timestamp, 'x-nonce': nonce,
+        'x-signature': createPluginSignature('test-event-secret-with-enough-length', timestamp, nonce, body) }, payload: body });
+    expect(response.statusCode).toBe(200);
+    expect(h.context.cases.get(`case_v2_${suffix}`)).toMatchObject({ workspace_id: h.workspaceId,
+      repository_id: h.repositoryId, routing_decision_id: routingId });
+    expect(h.context.proposals.get(`proposal_v2_${suffix}`)).toMatchObject({ workspace_binding_hash: workspaceBindingHash });
+    expect(h.context.workspaceStore.routingDecision(routingId)).toMatchObject({ mode: 'native', requires_human: false });
   });
 
   it('returns a replay for the same approval idempotency key and rejects key reuse with a changed body', async () => {
@@ -159,7 +197,7 @@ describe('console API', () => {
       method: 'GET', url: '/api/settings', headers: { authorization: `Bearer ${adminToken}` },
     });
     expect(settings.statusCode).toBe(200);
-    expect(settings.json()).toMatchObject({ max_concurrency: 3, monitored_repository: null });
+    expect(settings.json()).toMatchObject({ max_concurrency: 3, monitored_repository: 'example/automation' });
   });
 
   it('invalidates an active approval when proposal scope changes', async () => {

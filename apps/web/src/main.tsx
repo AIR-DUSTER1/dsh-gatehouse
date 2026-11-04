@@ -5,6 +5,7 @@ import { App as AntdApp, ConfigProvider } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { App } from './App';
 import { AuthProvider } from './hooks/useAuth';
+import { WorkspaceProvider } from './hooks/useWorkspace';
 import './styles.css';
 
 createRoot(document.getElementById('root')!).render(
@@ -52,7 +53,7 @@ createRoot(document.getElementById('root')!).render(
       <AntdApp>
         <BrowserRouter>
           <AuthProvider>
-            <App />
+            <WorkspaceProvider><App /></WorkspaceProvider>
           </AuthProvider>
         </BrowserRouter>
       </AntdApp>

@@ -5,7 +5,8 @@ import { parseJson } from '../domain/utils.js';
 type CaseRow = {
   id: string; plugin_case_id: string; source: Source; requester: string; title: string;
   requirement_text: string; requirement_hash: string; status: CaseStatus; risk_level: RiskLevel;
-  source_context: string; message_url: string | null; created_at: string; updated_at: string;
+  source_context: string; message_url: string | null; workspace_id: string | null; repository_id: string | null;
+  routing_decision_id: string | null; created_at: string; updated_at: string;
 };
 
 type QueueRow = CaseRow & { latest_proposal_summary: string; latest_rule_hits: string };
@@ -14,6 +15,7 @@ export interface CaseQuery {
   status?: CaseStatus | undefined;
   risk?: RiskLevel | undefined;
   source?: Source | undefined;
+  workspaceId?: string | undefined;
   search?: string | undefined;
   page: number;
   pageSize: number;
@@ -27,12 +29,13 @@ export class ReviewRepository {
     this.db.prepare(`
       INSERT INTO review_cases
       (id, plugin_case_id, source, requester, title, requirement_text, requirement_hash, status,
-       risk_level, source_context, message_url, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       risk_level, source_context, message_url, workspace_id, repository_id, routing_decision_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       input.id, input.plugin_case_id, input.source, input.requester, input.title,
       input.requirement_text, input.requirement_hash, input.status, input.risk_level,
-      input.source_context, input.message_url, input.created_at, input.updated_at,
+      input.source_context, input.message_url, input.workspace_id ?? null, input.repository_id ?? null,
+      input.routing_decision_id ?? null, input.created_at, input.updated_at,
     );
     return input;
   }
@@ -41,10 +44,11 @@ export class ReviewRepository {
     this.db.prepare(`
       UPDATE review_cases SET source = ?, requester = ?, title = ?, requirement_text = ?,
         requirement_hash = ?, status = ?, risk_level = ?, source_context = ?, message_url = ?,
-        updated_at = ? WHERE id = ?
+        workspace_id = ?, repository_id = ?, routing_decision_id = ?, updated_at = ? WHERE id = ?
     `).run(
       input.source, input.requester, input.title, input.requirement_text, input.requirement_hash,
-      input.status, input.risk_level, input.source_context, input.message_url, input.updated_at, input.id,
+      input.status, input.risk_level, input.source_context, input.message_url, input.workspace_id ?? null,
+      input.repository_id ?? null, input.routing_decision_id ?? null, input.updated_at, input.id,
     );
   }
 
@@ -75,6 +79,7 @@ export class ReviewRepository {
     if (query.status) { conditions.push('c.status = ?'); params.push(query.status); }
     if (query.risk) { conditions.push('c.risk_level = ?'); params.push(query.risk); }
     if (query.source) { conditions.push('c.source = ?'); params.push(query.source); }
+    if (query.workspaceId) { conditions.push('c.workspace_id = ?'); params.push(query.workspaceId); }
     if (query.search) {
       conditions.push('(c.title LIKE ? OR c.requester LIKE ? OR c.requirement_text LIKE ?)');
       const term = `%${query.search}%`; params.push(term, term, term);

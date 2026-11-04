@@ -7,6 +7,7 @@ import { DomainError, NotFoundError } from '../../domain/errors.js';
 import { headerValue, traceId } from '../request-context.js';
 
 const queueQuerySchema = z.object({
+  workspace_id: z.string().min(1),
   status: z.enum(CASE_STATUSES).optional(),
   risk: z.enum(RISK_LEVELS).optional(),
   source: z.enum(SOURCES).optional(),
@@ -17,9 +18,11 @@ const queueQuerySchema = z.object({
 
 export async function registerReviewRoutes(app: FastifyInstance, context: AppContext): Promise<void> {
   app.get('/api/review-cases', async (request) => {
-    requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context.config.sessionSecret);
     const query = queueQuerySchema.parse(request.query);
+    context.workspaceService.requireAccess(user, query.workspace_id);
     const result = context.query.listCases({
+      workspaceId: query.workspace_id,
       ...(query.status ? { status: query.status } : {}),
       ...(query.risk ? { risk: query.risk } : {}),
       ...(query.source ? { source: query.source } : {}),
@@ -31,15 +34,23 @@ export async function registerReviewRoutes(app: FastifyInstance, context: AppCon
   });
 
   app.get('/api/review-cases/:id', async (request) => {
-    requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context.config.sessionSecret);
     const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
-    return context.query.getCaseDetail(id);
+    const detail = context.query.getCaseDetail(id);
+    const workspaceId = detail.review_case.workspace_id;
+    if (!workspaceId) throw new DomainError('WORKSPACE_REQUIRED', '该复核需求尚未归属工作区', '请管理员完成数据迁移或指定工作区', 409);
+    context.workspaceService.requireAccess(user, workspaceId);
+    return detail;
   });
 
   app.get('/api/proposals/:id', async (request) => {
-    requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context.config.sessionSecret);
     const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
-    return context.query.getProposalDetail(id);
+    const detail = context.query.getProposalDetail(id);
+    const workspaceId = detail.proposal.workspace_id;
+    if (!workspaceId) throw new DomainError('WORKSPACE_REQUIRED', '该提案尚未归属工作区', '请复核人先指定目标工作区', 409);
+    context.workspaceService.requireAccess(user, workspaceId);
+    return detail;
   });
 
   app.post('/api/proposals/:id/decision', async (request) => {
@@ -64,7 +75,9 @@ export async function registerReviewRoutes(app: FastifyInstance, context: AppCon
   });
 
   app.get('/api/dashboard', async (request) => {
-    requestUser(request, context.config.sessionSecret);
-    return context.query.dashboard();
+    const user = requestUser(request, context.config.sessionSecret);
+    const { workspace_id: workspaceId } = z.object({ workspace_id: z.string().min(1) }).parse(request.query);
+    context.workspaceService.requireAccess(user, workspaceId);
+    return context.query.dashboard(workspaceId);
   });
 }

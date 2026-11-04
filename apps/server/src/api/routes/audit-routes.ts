@@ -4,6 +4,7 @@ import type { AppContext } from '../../app.js';
 import { requestUser } from '../../auth.js';
 
 const auditQuerySchema = z.object({
+  workspace_id: z.string().min(1),
   entity_type: z.string().trim().max(100).optional(),
   entity_id: z.string().trim().max(200).optional(),
   action: z.string().trim().max(100).optional(),
@@ -13,9 +14,11 @@ const auditQuerySchema = z.object({
 
 export async function registerAuditRoutes(app: FastifyInstance, context: AppContext): Promise<void> {
   app.get('/api/audit', async (request) => {
-    requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context.config.sessionSecret);
     const query = auditQuerySchema.parse(request.query);
+    context.workspaceService.requireAccess(user, query.workspace_id);
     const result = context.query.listAudit({
+      workspaceId: query.workspace_id,
       ...(query.entity_type ? { entityType: query.entity_type } : {}),
       ...(query.entity_id ? { entityId: query.entity_id } : {}),
       ...(query.action ? { action: query.action } : {}),

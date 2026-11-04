@@ -11,6 +11,7 @@ export interface AuditInput {
   after?: unknown;
   traceId: string;
   at?: string;
+  workspaceId?: string | null;
 }
 
 /** Records business facts only; it never decides whether an action is allowed. */
@@ -27,6 +28,7 @@ export class AuditService {
       before: input.before ?? null,
       after: input.after ?? null,
       trace_id: input.traceId,
+      workspace_id: input.workspaceId ?? null,
       created_at: input.at ?? nowIso(),
     };
     this.repository.append(event);

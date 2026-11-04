@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Avatar, Button, Drawer, Dropdown, Flex, Grid, Layout, Menu, Space, Typography } from 'antd';
+import { Avatar, Button, Drawer, Dropdown, Flex, Grid, Layout, Menu, Select, Space, Typography } from 'antd';
 import {
-  AuditOutlined, BellOutlined, CalendarOutlined, ControlOutlined, DashboardOutlined, DownOutlined,
-  LogoutOutlined, MenuOutlined, RocketOutlined, SafetyCertificateOutlined, SettingOutlined,
+  ApartmentOutlined, AuditOutlined, BarChartOutlined, BellOutlined, CalendarOutlined, ControlOutlined,
+  DashboardOutlined, DownOutlined, GithubOutlined, GitlabOutlined, LogoutOutlined, MenuOutlined,
+  RocketOutlined, SafetyCertificateOutlined, SettingOutlined,
 } from '@ant-design/icons';
-import { useApiData } from '../hooks/useApiData';
 import { useAuth } from '../hooks/useAuth';
+import { useWorkspace, workspacePath, workspaceSuffix } from '../hooks/useWorkspace';
 import { roleLabels } from '../lib/format';
-import type { SettingsResponse } from '../types/api';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -17,30 +17,56 @@ function navLabel(index: string, label: string) {
   return <span><span className="nav-index">{index}</span>{label}</span>;
 }
 
-const primaryItems = [
-  { key: '/', icon: <DashboardOutlined />, label: navLabel('01', '工作台') },
-  { key: '/review', icon: <AuditOutlined />, label: navLabel('02', '复核中心') },
-  { key: '/schedule', icon: <CalendarOutlined />, label: navLabel('03', '执行调度') },
-  { key: '/executions', icon: <RocketOutlined />, label: navLabel('04', '交付记录') },
-  { key: '/audit', icon: <ControlOutlined />, label: navLabel('05', '审计日志') },
-];
-const settingsItem = { key: '/settings', icon: <SettingOutlined />, label: navLabel('06', '系统设置') };
+function workspaceItems(workspaceId: string) {
+  return [
+    { key: workspacePath(workspaceId), icon: <DashboardOutlined />, label: navLabel('01', '工作台') },
+    { key: workspacePath(workspaceId, 'review'), icon: <AuditOutlined />, label: navLabel('02', '复核中心') },
+    { key: workspacePath(workspaceId, 'schedule'), icon: <CalendarOutlined />, label: navLabel('03', '执行调度') },
+    { key: workspacePath(workspaceId, 'executions'), icon: <RocketOutlined />, label: navLabel('04', '交付记录') },
+    { key: workspacePath(workspaceId, 'audit'), icon: <ControlOutlined />, label: navLabel('05', '审计日志') },
+  ];
+}
+
+function globalItemsFor(role: string | undefined) {
+  return [
+    ...(role === 'admin' ? [{ key: '/analytics', icon: <BarChartOutlined />, label: navLabel('06', '全局统计') }] : []),
+    { key: '/workspaces', icon: <ApartmentOutlined />, label: navLabel('07', '工作区') },
+  ];
+}
+const settingsItem = { key: '/settings', icon: <SettingOutlined />, label: navLabel('08', '系统设置') };
+
 const titles: Record<string, { title: string; section: string }> = {
-  '/': { title: '工作台', section: '总览' }, '/review': { title: '复核中心', section: '人工决策' },
-  '/schedule': { title: '执行调度', section: '排期控制' }, '/executions': { title: '交付记录', section: '执行结果' },
-  '/audit': { title: '审计日志', section: '全链路追踪' }, '/settings': { title: '系统设置', section: '连接与权限' },
+  '': { title: '工作台', section: '当前工作区' },
+  review: { title: '复核中心', section: '人工决策' },
+  schedule: { title: '执行调度', section: '排期控制' },
+  executions: { title: '交付记录', section: '执行结果' },
+  audit: { title: '审计日志', section: '全链路追踪' },
 };
+
+function routeTitle(pathname: string) {
+  if (pathname === '/analytics') return { title: '全局统计', section: '跨工作区总览' };
+  if (pathname === '/workspaces') return { title: '工作区与仓库', section: '接入配置' };
+  if (pathname === '/settings') return { title: '系统设置', section: '连接与权限' };
+  if (pathname.includes('/review/')) return { title: '需求详情', section: '人工决策' };
+  const suffix = workspaceSuffix(pathname).split('/')[0] ?? '';
+  return titles[suffix] ?? { title: '工作区', section: 'Gatehouse' };
+}
 
 function Navigation({ onNavigate }: { onNavigate?: () => void }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const selected = location.pathname.startsWith('/review/') ? '/review' : location.pathname;
+  const { currentId, preferred } = useWorkspace();
+  const suffix = workspaceSuffix(location.pathname);
+  const navigationId = currentId ?? preferred?.id ?? null;
+  const selected = navigationId
+    ? workspacePath(navigationId, suffix.startsWith('review/') ? 'review' : suffix)
+    : location.pathname;
   return (
     <Menu
       theme="dark"
       mode="inline"
       selectedKeys={[selected]}
-      items={primaryItems}
+      items={navigationId ? workspaceItems(navigationId) : []}
       onClick={({ key }) => { navigate(key); onNavigate?.(); }}
       className="main-navigation"
     />
@@ -59,19 +85,22 @@ function HeaderClock() {
   return <Text className="header-clock">UTC+8 {text}</Text>;
 }
 
+function ProviderMark({ provider }: { provider: string }) {
+  if (provider === 'github') return <GithubOutlined />;
+  if (provider === 'gitlab') return <GitlabOutlined />;
+  return <span className="provider-mark">{provider.slice(0, 2).toUpperCase()}</span>;
+}
+
 export function AppShell() {
   const { user, logout } = useAuth();
+  const { workspaces, current, preferred, currentId, loading } = useWorkspace();
   const navigate = useNavigate();
   const location = useLocation();
   const screens = Grid.useBreakpoint();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const { data: workspaceSettings, loading: workspaceLoading } = useApiData<SettingsResponse>('/api/settings');
-  const repositoryParts = workspaceSettings?.monitored_repository?.split('/');
-  const repositoryOwner = repositoryParts?.[0] ?? '';
-  const repositoryName = repositoryParts?.slice(1).join('/') ?? '';
-  const routeInfo = location.pathname.startsWith('/review/')
-    ? { title: '需求详情', section: '人工决策' }
-    : titles[location.pathname] ?? { title: '复核中心', section: 'Gatehouse' };
+  const routeInfo = routeTitle(location.pathname);
+  const suffix = workspaceSuffix(location.pathname);
+  const shownWorkspace = current ?? preferred;
   const userMenu = useMemo(() => ({
     items: [
       { key: 'email', label: user?.email ?? '', disabled: true },
@@ -81,36 +110,75 @@ export function AppShell() {
     onClick: ({ key }: { key: string }) => { if (key === 'logout') { logout(); navigate('/login'); } },
   }), [logout, navigate, user?.email]);
 
+  const selectWorkspace = (nextId: string) => {
+    const nextSuffix = currentId ? suffix : '';
+    navigate(workspacePath(nextId, nextSuffix));
+    setDrawerOpen(false);
+  };
+
+  const workspaceSelector = (
+    <div className="workspace-card workspace-card--interactive">
+      <Flex justify="space-between" align="center">
+        <Text className="workspace-label">当前工作区</Text>
+        <span className={`workspace-state workspace-state--${shownWorkspace?.status ?? 'onboarding'}`}>
+          {shownWorkspace?.status === 'active' ? '运行中' : shownWorkspace?.status === 'error' ? '异常' : shownWorkspace?.status === 'disabled' ? '已停用' : '接入中'}
+        </span>
+      </Flex>
+      <Select
+        value={shownWorkspace?.id ?? null}
+        loading={loading}
+        disabled={!workspaces.length}
+        showSearch
+        optionFilterProp="search"
+        placeholder={loading ? '读取工作区…' : '选择工作区'}
+        onChange={selectWorkspace}
+        popupMatchSelectWidth={300}
+        className="workspace-select"
+        options={workspaces.map((workspace) => ({
+          value: workspace.id,
+          search: `${workspace.name} ${workspace.slug} ${workspace.repositories.map((repo) => repo.repository_key).join(' ')}`,
+          label: (
+            <Flex align="center" gap={9} className="workspace-option">
+              <span className={`workspace-dot workspace-dot--${workspace.status}`} />
+              <span className="workspace-option-copy">
+                <strong>{workspace.name}</strong>
+                <small>{workspace.repositories[0]?.repository_key ?? '尚未绑定仓库'}</small>
+              </span>
+              {workspace.repositories[0] ? <ProviderMark provider={workspace.repositories[0].provider} /> : null}
+            </Flex>
+          ),
+        }))}
+        notFoundContent={<span className="workspace-empty-option">没有可访问的工作区</span>}
+      />
+      <Flex justify="space-between" align="center" className="workspace-card-meta">
+        <Text type="secondary">{shownWorkspace
+          ? `${shownWorkspace.repositories[0]?.repository_key ?? '尚未绑定仓库'}${shownWorkspace.repositories.length > 1 ? ` +${shownWorkspace.repositories.length - 1}` : ''} · ${shownWorkspace.open_tasks} 个进行中任务`
+          : '请先创建工作区'}</Text>
+        <Button type="link" size="small" onClick={() => { navigate('/workspaces'); setDrawerOpen(false); }}>管理</Button>
+      </Flex>
+    </div>
+  );
+
   const sidebarContent = (
     <>
       <Flex className="brand" align="center" gap={10}>
         <span className="brand-symbol"><SafetyCertificateOutlined /></span>
         <span className="brand-wordmark"><strong>Gatehouse</strong><small>Agent Delivery Control</small></span>
       </Flex>
-      <div className="workspace-card">
-        <Text className="workspace-label">当前工作区</Text>
-        <Flex align="flex-start" gap={8} className="workspace-repository" title={workspaceSettings?.monitored_repository ?? undefined}>
-          <span className="workspace-mark">GH</span>
-          <span className="workspace-repository-name">
-            {workspaceSettings?.monitored_repository ? (
-              <>
-                <span>{repositoryOwner}/</span><strong>{repositoryName}</strong>
-              </>
-            ) : (
-              <span className="workspace-repository-empty">{workspaceLoading ? '正在读取监听仓库…' : '未配置监听仓库'}</span>
-            )}
-          </span>
-          <DownOutlined />
-        </Flex>
-      </div>
-      <Text className="nav-caption">管理</Text>
+      {workspaceSelector}
+      <Text className="nav-caption">当前工作区</Text>
       <Navigation onNavigate={() => setDrawerOpen(false)} />
+      <div className="sidebar-system sidebar-global">
+        <Text className="nav-caption">全局</Text>
+        <Menu theme="dark" mode="inline" selectedKeys={[location.pathname]} items={globalItemsFor(user?.role)}
+          onClick={({ key }) => { navigate(key); setDrawerOpen(false); }} />
+      </div>
       <div className="sidebar-system">
-        <Text className="nav-caption">系统</Text>
-        <Menu theme="dark" mode="inline" selectedKeys={[location.pathname]} items={[settingsItem]} onClick={({ key }) => { navigate(key); setDrawerOpen(false); }} />
+        <Menu theme="dark" mode="inline" selectedKeys={[location.pathname]} items={[settingsItem]}
+          onClick={({ key }) => { navigate(key); setDrawerOpen(false); }} />
       </div>
       <div className="sidebar-bottom">
-        <div className="runtime-status"><span className="lamp on" /><div><Text>控制面运行正常</Text><Text type="secondary">outbox 自动重试已启用</Text></div></div>
+        <div className="runtime-status"><span className={`lamp ${current?.status === 'active' ? 'on' : 'idle'}`} /><div><Text>{current?.status === 'active' ? '当前工作区运行正常' : '工作区等待配置'}</Text><Text type="secondary">同步、授权与审计已隔离</Text></div></div>
         <Flex align="center" gap={9} className="signed-user">
           <Avatar className="person-avatar">{user?.name?.slice(-2)}</Avatar>
           <div><Text strong>{user?.name}</Text><Text type="secondary">{user ? roleLabels[user.role] : ''}</Text></div>
@@ -122,8 +190,9 @@ export function AppShell() {
 
   return (
     <Layout className="app-layout">
-      {screens.lg ? <Sider width={232} className="app-sider">{sidebarContent}</Sider> : null}
-      <Drawer placement="left" size={252} closable={false} open={!screens.lg && drawerOpen} onClose={() => setDrawerOpen(false)} styles={{ body: { padding: 0, background: '#141311' } }}>
+      {screens.lg ? <Sider width={248} className="app-sider">{sidebarContent}</Sider> : null}
+      <Drawer placement="left" size={268} closable={false} open={!screens.lg && drawerOpen} onClose={() => setDrawerOpen(false)}
+        styles={{ body: { padding: 0, background: '#141311' } }}>
         <div className="app-sider drawer-sider">{sidebarContent}</div>
       </Drawer>
       <Layout>

@@ -23,6 +23,8 @@ export interface AppConfig {
   bootstrapAdminName: string;
   bootstrapAdminPassword: string;
   sessionTtlSeconds: number;
+  repositoryHostAllowlist: string[];
+  allowPrivateRepositoryHosts: boolean;
 }
 
 function integer(name: string, fallback: number): number {
@@ -52,6 +54,9 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     bootstrapAdminName: process.env.BOOTSTRAP_ADMIN_NAME ?? '',
     bootstrapAdminPassword: process.env.BOOTSTRAP_ADMIN_PASSWORD ?? '',
     sessionTtlSeconds: integer('SESSION_TTL_SECONDS', 8 * 60 * 60),
+    repositoryHostAllowlist: (process.env.REPOSITORY_HOST_ALLOWLIST ?? '')
+      .split(',').map((host) => host.trim().toLowerCase()).filter(Boolean),
+    allowPrivateRepositoryHosts: process.env.ALLOW_PRIVATE_REPOSITORY_HOSTS === 'true',
     ...overrides,
   };
 }

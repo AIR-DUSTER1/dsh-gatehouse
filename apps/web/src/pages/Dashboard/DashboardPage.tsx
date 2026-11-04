@@ -6,6 +6,7 @@ import {
 import type { DashboardResponse, ReviewQueueResponse } from '../../types/api';
 import { useApiData } from '../../hooks/useApiData';
 import { useAuth } from '../../hooks/useAuth';
+import { useWorkspace, workspacePath } from '../../hooks/useWorkspace';
 import { actionLabels, formatDate, relativeTime, riskLabels } from '../../lib/format';
 import { ErrorState, LoadingState, PageHeader, RiskBadge, SourceBadge } from '../../components/ui';
 
@@ -15,8 +16,10 @@ const riskBarColors: Record<string, string> = { critical: '#c73325', high: '#e84
 
 export function DashboardPage() {
   const { user } = useAuth();
-  const { data, loading, error, reload } = useApiData<DashboardResponse>('/api/dashboard');
-  const { data: queue } = useApiData<ReviewQueueResponse>('/api/review-cases?status=pending_review&page=1&page_size=4');
+  const { current, currentId } = useWorkspace();
+  const workspaceId = currentId ?? '';
+  const { data, loading, error, reload } = useApiData<DashboardResponse>(`/api/dashboard?workspace_id=${encodeURIComponent(workspaceId)}`);
+  const { data: queue } = useApiData<ReviewQueueResponse>(`/api/review-cases?workspace_id=${encodeURIComponent(workspaceId)}&status=pending_review&page=1&page_size=4`);
   if (loading) return <LoadingState />;
   if (error || !data) return <ErrorState message={error?.message ?? '工作台加载失败'} action={error?.body.error.action} onRetry={reload} />;
   const greeting = new Date().getHours() < 12 ? '早上好' : new Date().getHours() < 18 ? '下午好' : '晚上好';
@@ -30,7 +33,7 @@ export function DashboardPage() {
 
   return (
     <div className="page-stack">
-      <PageHeader eyebrow="SEC.01 / OVERVIEW" title={`${greeting}，${user?.name ?? '复核人'}`} description="查看当前待办、风险分布和最近执行动态。" actions={<Link to="/review"><Button type="primary">进入复核中心</Button></Link>} />
+      <PageHeader eyebrow="SEC.01 / WORKSPACE OVERVIEW" title={`${greeting}，${user?.name ?? '复核人'}`} description={`${current?.name ?? '当前工作区'}的待办、风险分布和最近执行动态。`} actions={<Link to={workspacePath(workspaceId, 'review')}><Button type="primary">进入复核中心</Button></Link>} />
 
       <Row gutter={[12, 12]}>
         {metrics.map((metric, index) => (
@@ -51,7 +54,7 @@ export function DashboardPage() {
 
       <Row gutter={[12, 12]}>
         <Col xs={24} xl={16}>
-          <Card title="优先复核 / QUEUE" extra={<Link to="/review">查看全部</Link>} variant="borderless">
+          <Card title="优先复核 / QUEUE" extra={<Link to={workspacePath(workspaceId, 'review')}>查看全部</Link>} variant="borderless">
             <Flex vertical gap={10}>
               {queue?.items.length ? queue.items.map((item, index) => (
                 <Card key={item.id} size="small" className="queue-item">
@@ -59,11 +62,11 @@ export function DashboardPage() {
                     <span className="index-no">Q.{String(index + 1).padStart(2, '0')}</span>
                     <Avatar className="person-avatar">{item.requester.slice(-2)}</Avatar>
                     <div className="focus-copy">
-                      <Space wrap size={[8, 4]}><Link to={`/review/${item.id}`}><Text strong>{item.title}</Text></Link><RiskBadge risk={item.risk_level} /><SourceBadge source={item.source} /></Space>
+                      <Space wrap size={[8, 4]}><Link to={workspacePath(workspaceId, `review/${item.id}`)}><Text strong>{item.title}</Text></Link><RiskBadge risk={item.risk_level} /><SourceBadge source={item.source} /></Space>
                       <Text type="secondary" ellipsis>{item.latest_proposal_summary}</Text>
                       <Text type="secondary" className="small-text mono-note">{item.requester} · {relativeTime(item.created_at)}</Text>
                     </div>
-                    <Link to={`/review/${item.id}`} className="push-right">查看详情</Link>
+                    <Link to={workspacePath(workspaceId, `review/${item.id}`)} className="push-right">查看详情</Link>
                   </Flex>
                 </Card>
               )) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无待复核需求" />}
@@ -94,7 +97,7 @@ export function DashboardPage() {
           </Card>
         </Col>
         <Col xs={24} xl={14}>
-          <Card title="最近动态 / ACTIVITY" extra={<Link to="/audit">审计日志</Link>} variant="borderless">
+          <Card title="最近动态 / ACTIVITY" extra={<Link to={workspacePath(workspaceId, 'audit')}>审计日志</Link>} variant="borderless">
             <Timeline items={data.recent_activity.map(event => ({
               icon: event.action.includes('finished') ? <CheckCircleOutlined /> : event.action.includes('failed') ? <WarningOutlined /> : <ThunderboltOutlined />,
               content: <Flex justify="space-between" gap={12}><div><Text strong>{actionLabels[event.action] ?? event.action}</Text><br /><Text type="secondary" className="small-text mono-note">{event.actor} · {event.entity_id}</Text></div><Text type="secondary" className="small-text mono-note">{formatDate(event.created_at)}</Text></Flex>,

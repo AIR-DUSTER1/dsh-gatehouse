@@ -6,7 +6,8 @@ type ProposalRow = {
   id: string; review_case_id: string; assessment_revision: number; summary: string;
   scope_json: string; scope_hash: string; rule_hits_json: string; impact_files_json: string;
   test_plan_json: string; estimated_cost: string; risk: ProposalRecord['risk']; risk_reason: string;
-  status: ProposalStatus; created_at: string; updated_at: string;
+  status: ProposalStatus; workspace_id: string | null; repository_id: string | null;
+  workspace_binding_hash: string | null; created_at: string; updated_at: string;
 };
 
 /** Persistence boundary for immutable proposal versions. */
@@ -17,13 +18,15 @@ export class ProposalRepository {
     this.db.prepare(`
       INSERT INTO proposals
       (id, review_case_id, assessment_revision, summary, scope_json, scope_hash, rule_hits_json,
-       impact_files_json, test_plan_json, estimated_cost, risk, risk_reason, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       impact_files_json, test_plan_json, estimated_cost, risk, risk_reason, status, workspace_id,
+       repository_id, workspace_binding_hash, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       input.id, input.review_case_id, input.assessment_revision, input.summary, JSON.stringify(input.scope),
       input.scope_hash, JSON.stringify(input.rule_hits), JSON.stringify(input.impact_files),
       JSON.stringify(input.test_plan), input.estimated_cost, input.risk, input.risk_reason,
-      input.status, input.created_at, input.updated_at,
+      input.status, input.workspace_id ?? null, input.repository_id ?? null,
+      input.workspace_binding_hash ?? null, input.created_at, input.updated_at,
     );
     return input;
   }
@@ -32,11 +35,12 @@ export class ProposalRepository {
     this.db.prepare(`
       UPDATE proposals SET summary = ?, scope_json = ?, scope_hash = ?, rule_hits_json = ?,
        impact_files_json = ?, test_plan_json = ?, estimated_cost = ?, risk = ?, risk_reason = ?,
-       status = ?, updated_at = ? WHERE id = ?
+       status = ?, workspace_id = ?, repository_id = ?, workspace_binding_hash = ?, updated_at = ? WHERE id = ?
     `).run(
       input.summary, JSON.stringify(input.scope), input.scope_hash, JSON.stringify(input.rule_hits),
       JSON.stringify(input.impact_files), JSON.stringify(input.test_plan), input.estimated_cost,
-      input.risk, input.risk_reason, input.status, input.updated_at, input.id,
+      input.risk, input.risk_reason, input.status, input.workspace_id ?? null,
+      input.repository_id ?? null, input.workspace_binding_hash ?? null, input.updated_at, input.id,
     );
   }
 
@@ -81,6 +85,9 @@ export class ProposalRepository {
       risk: row.risk,
       risk_reason: row.risk_reason,
       status: row.status,
+      workspace_id: row.workspace_id,
+      repository_id: row.repository_id,
+      workspace_binding_hash: row.workspace_binding_hash,
       created_at: row.created_at,
       updated_at: row.updated_at,
     };

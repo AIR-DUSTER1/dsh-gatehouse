@@ -3,6 +3,7 @@ import type { Database } from '../db/database.js';
 
 type GrantRow = {
   id: string; proposal_id: string; reviewer: string; requirement_hash: string; scope_hash: string;
+  workspace_binding_hash: string | null;
   approved_at: string; schedule_at: string; expires_at: string; consumed_at: string | null;
   status: ApprovalGrantRecord['status'];
 };
@@ -13,10 +14,11 @@ export class GrantRepository {
 
   create(input: ApprovalGrantRecord): void {
     this.db.prepare(`
-      INSERT INTO approval_grants(id, proposal_id, reviewer, requirement_hash, scope_hash, approved_at,
-        schedule_at, expires_at, consumed_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO approval_grants(id, proposal_id, reviewer, requirement_hash, scope_hash, workspace_binding_hash,
+        approved_at, schedule_at, expires_at, consumed_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(input.id, input.proposal_id, input.reviewer, input.requirement_hash, input.scope_hash,
-      input.approved_at, input.schedule_at, input.expires_at, input.consumed_at, input.status);
+      input.workspace_binding_hash ?? null, input.approved_at, input.schedule_at, input.expires_at,
+      input.consumed_at, input.status);
   }
 
   /** Create a Grant or reactivate the Proposal's existing Grant after withdrawal. */
@@ -28,10 +30,10 @@ export class GrantRepository {
     }
     this.db.prepare(`
       UPDATE approval_grants SET reviewer = ?, requirement_hash = ?, scope_hash = ?, approved_at = ?,
-        schedule_at = ?, expires_at = ?, consumed_at = NULL, status = 'active'
+        workspace_binding_hash = ?, schedule_at = ?, expires_at = ?, consumed_at = NULL, status = 'active'
       WHERE id = ?
     `).run(input.reviewer, input.requirement_hash, input.scope_hash, input.approved_at,
-      input.schedule_at, input.expires_at, existing.id);
+      input.workspace_binding_hash ?? null, input.schedule_at, input.expires_at, existing.id);
     return { ...input, id: existing.id, consumed_at: null, status: 'active' };
   }
 
@@ -71,10 +73,12 @@ export class GrantRepository {
     return Number(result.changes) === 1;
   }
 
-  findByProposalWithHash(proposalId: string, requirementHash: string, scopeHash: string): ApprovalGrantRecord | null {
+  findByProposalWithHash(proposalId: string, requirementHash: string, scopeHash: string,
+    workspaceBindingHash: string | null = null): ApprovalGrantRecord | null {
     const grant = this.getByProposal(proposalId);
     if (!grant) return null;
     if (grant.requirement_hash !== requirementHash || grant.scope_hash !== scopeHash) return null;
+    if ((grant.workspace_binding_hash ?? null) !== workspaceBindingHash) return null;
     return grant;
   }
 }

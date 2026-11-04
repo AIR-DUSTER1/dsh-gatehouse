@@ -6,7 +6,7 @@
   "additionalProperties": false,
   "required": ["version", "event_id", "event_type", "occurred_at", "trace_id", "data"],
   "properties": {
-    "version": { "const": "1.0" },
+    "version": { "enum": ["1.0", "2.0"] },
     "event_id": { "type": "string", "minLength": 1 },
     "event_type": { "enum": ["proposal.created", "proposal.updated", "proposal.superseded", "execution.started", "execution.finished", "execution.failed"] },
     "occurred_at": { "type": "string", "format": "date-time" },

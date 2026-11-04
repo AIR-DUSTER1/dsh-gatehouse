@@ -5,6 +5,7 @@ type ScheduleRow = {
   id: string; proposal_id: string; grant_id: string; schedule_at: string; expires_at: string;
   status: ScheduleStatus; approval_synced_at: string | null; attempts: number; max_attempts: number;
   last_error: string | null; execution_id: string | null; pr_url: string | null;
+  workspace_id: string | null; repository_id: string | null;
   created_at: string; updated_at: string;
 };
 
@@ -18,11 +19,12 @@ export class ScheduleRepository {
   create(input: ScheduleRecord): void {
     this.db.prepare(`
       INSERT INTO schedules(id, proposal_id, grant_id, schedule_at, expires_at, status, approval_synced_at,
-        attempts, max_attempts, last_error, execution_id, pr_url, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        attempts, max_attempts, last_error, execution_id, pr_url, workspace_id, repository_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(input.id, input.proposal_id, input.grant_id, input.schedule_at, input.expires_at,
       input.status, input.approval_synced_at, input.attempts, input.max_attempts, input.last_error,
-      input.execution_id, input.pr_url, input.created_at, input.updated_at);
+      input.execution_id, input.pr_url, input.workspace_id ?? null, input.repository_id ?? null,
+      input.created_at, input.updated_at);
   }
 
   /** Create or reset the Proposal's schedule, including reapproval after withdrawal. */
@@ -35,9 +37,10 @@ export class ScheduleRepository {
     this.db.prepare(`
       UPDATE schedules SET grant_id = ?, schedule_at = ?, expires_at = ?, status = 'scheduled',
         approval_synced_at = NULL, attempts = 0, max_attempts = ?, last_error = NULL,
-        execution_id = NULL, pr_url = NULL, updated_at = ?
+        execution_id = NULL, pr_url = NULL, workspace_id = ?, repository_id = ?, updated_at = ?
       WHERE id = ?
-    `).run(input.grant_id, input.schedule_at, input.expires_at, input.max_attempts, input.updated_at, existing.id);
+    `).run(input.grant_id, input.schedule_at, input.expires_at, input.max_attempts,
+      input.workspace_id ?? null, input.repository_id ?? null, input.updated_at, existing.id);
     return { ...input, id: existing.id, created_at: existing.created_at, status: 'scheduled',
       approval_synced_at: null, attempts: 0, last_error: null, execution_id: null, pr_url: null };
   }
@@ -52,9 +55,12 @@ export class ScheduleRepository {
     return row ? { ...row } : null;
   }
 
-  list(status?: ScheduleStatus): ScheduleListItem[] {
-    const where = status ? 'WHERE s.status = ?' : '';
-    const params = status ? [status] : [];
+  list(status?: ScheduleStatus, workspaceId?: string): ScheduleListItem[] {
+    const conditions: string[] = [];
+    const params: Array<string> = [];
+    if (status) { conditions.push('s.status = ?'); params.push(status); }
+    if (workspaceId) { conditions.push('s.workspace_id = ?'); params.push(workspaceId); }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const rows = this.db.prepare(`
       SELECT s.*, c.id AS review_case_id, c.title, c.requester, c.risk_level, p.summary AS proposal_summary,
         CASE WHEN EXISTS (
@@ -73,6 +79,8 @@ export class ScheduleRepository {
     return this.db.prepare(`
       SELECT * FROM schedules
       WHERE status = 'scheduled' AND approval_synced_at IS NOT NULL AND schedule_at <= ?
+        AND workspace_id IS NOT NULL
+        AND EXISTS (SELECT 1 FROM workspaces w WHERE w.id = schedules.workspace_id AND w.status = 'active')
       ORDER BY schedule_at ASC LIMIT ?
     `).all(now, limit) as ScheduleRow[];
   }

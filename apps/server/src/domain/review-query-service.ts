@@ -67,17 +67,17 @@ export class ReviewQueryService {
     };
   }
 
-  listSchedules(): ScheduleListItem[] {
-    return this.schedules.list();
+  listSchedules(workspaceId: string): ScheduleListItem[] {
+    return this.schedules.list(undefined, workspaceId);
   }
 
   listAudit(query: AuditQuery): { items: AuditEventRecord[]; total: number } {
     return this.audit.list(query);
   }
 
-  dashboard(): DashboardStatistics {
-    const all = this.cases.list({ page: 1, pageSize: 10000 }).items;
-    const schedules = this.schedules.list();
+  dashboard(workspaceId: string): DashboardStatistics {
+    const all = this.cases.list({ workspaceId, page: 1, pageSize: 10000 }).items;
+    const schedules = this.schedules.list(undefined, workspaceId);
     const riskDistribution: Record<RiskLevel, number> = { low: 0, medium: 0, high: 0, critical: 0 };
     for (const item of all) riskDistribution[item.risk_level] += 1;
     const ruleCounts = new Map<string, number>();
@@ -85,7 +85,7 @@ export class ReviewQueryService {
     const completed = schedules.filter((item) => item.status === 'completed').length;
     const failed = schedules.filter((item) => item.status === 'failed').length;
     const finished = completed + failed;
-    const metrics = this.analytics.reviewMetrics();
+    const metrics = this.analytics.reviewMetrics(workspaceId);
     return {
       total_cases: all.length,
       pending_review: all.filter((item) => item.status === 'pending_review').length,
@@ -95,7 +95,7 @@ export class ReviewQueryService {
       approved_sla_rate: metrics.slaRate,
       risk_distribution: riskDistribution,
       rule_hits: [...ruleCounts.entries()].map(([rule, count]) => ({ rule, count })).sort((a, b) => b.count - a.count).slice(0, 6),
-      recent_activity: this.audit.recent(8),
+      recent_activity: this.audit.recent(8, workspaceId),
     };
   }
 

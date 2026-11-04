@@ -36,6 +36,25 @@ pnpm dev
 
 `PLUGIN_MODE=mock` 仅用于自动化测试和本地开发，会产生模拟执行结果。生产环境必须使用 `PLUGIN_MODE=http` 并配置 `dsh-superagent` 地址与共享密钥。
 
+## 多工作区与仓库
+
+Gatehouse 是工作区和仓库配置的控制面，DSH Superagent Review 执行实际连接与轮询。
+
+1. 管理员进入“工作区与仓库”，新建工作区并填写 Provider、仓库标识、API/Web/克隆地址与凭据引用。
+2. Gatehouse 调用 DSH 做只读连通性和权限检查，并读取仓库元数据与 README。
+3. DSH 使用当前配置且位于允许列表中的模型生成仓库描述建议。
+4. 管理员确认描述后，Gatehouse 保存版本和哈希，吊销旧工作区绑定授权，并同步给 DSH。
+5. 后续任务通过 URL 中的 `/w/:workspaceId/...` 隔离展示；全局统计在 `/analytics` 汇总。
+
+凭据字段只接受 `env:NAME` 或 `file:PATH` 引用，用于 Gatehouse 触发 DSH 的只读仓库发现；实际 Git Push/PR 仍使用 DSH 运行账户已配置的 CLI/Git 凭据，不保存明文 Token。首版不宣传未实现的 `system:` 凭据解析。生产环境应设置：
+
+```dotenv
+REPOSITORY_HOST_ALLOWLIST=github.com,git.internal.example
+ALLOW_PRIVATE_REPOSITORY_HOSTS=true
+```
+
+首个稳定版本完整支持 GitHub 多仓库事件轮询；GitHub Enterprise 使用同一机制时，需要 `gh` CLI 已登录对应主机，并把该主机加入允许列表。GitLab、Gitea、Bitbucket 和裸 Git 可作为通用执行 Target 接入（校验、描述、路由与 Git 交付），但本版本不伪装其原生 Issue/MR 事件轮询能力；任务来源应使用飞书、Webhook 或人工录入。自定义 CA 文件解析与 `system:` 凭据存储属于后续能力，本版本会在校验阶段明确拒绝，而不是静默忽略。
+
 ## 常用命令
 
 ```powershell
@@ -59,6 +78,9 @@ pnpm commit:check  # 校验当前 HEAD 的提交信息
 - ApprovalGrant 一次性消费；需求或范围哈希变化会使旧批准失效。
 - Gatehouse 与执行侧共用同一 canonical Grant ID；执行同步失败时可安全复用原 execution_id 重试。
 - 审计表 append-only，由 SQLite 触发器阻止更新和删除。
+- 工作区、仓库、成员和工作区绑定哈希均由服务端校验，所有任务、排期和审计查询都强制携带 `workspace_id`。
+- 仓库描述版本化；描述或工作区绑定变化会使旧 Grant 失效并要求重新复核。
+- 全局统计与工作区明细复用同一组参数化 SQL，并有合计对账测试。
 
 详细文档见 [架构说明](docs/architecture.md)、[审批流程](docs/approval-flow.md)、[插件集成](docs/plugin-integration.md)、[数据模型](docs/data-model.md) 和 [验收清单](docs/acceptance-checklist.md)。
 

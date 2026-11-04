@@ -9,6 +9,7 @@ import dayjs, { type Dayjs } from 'dayjs';
 import { api, ApiError } from '../../api/client';
 import { useApiData } from '../../hooks/useApiData';
 import { useAuth } from '../../hooks/useAuth';
+import { useWorkspace, workspacePath } from '../../hooks/useWorkspace';
 import { formatFullDate } from '../../lib/format';
 import type { ScheduleActionResponse, ScheduleResponse } from '../../types/api';
 import { ErrorState, LoadingState, PageHeader, RiskBadge, StatusBadge } from '../../components/ui';
@@ -27,8 +28,10 @@ interface WithdrawForm { reason: string }
 
 export function SchedulePage() {
   const { user } = useAuth();
+  const { currentId } = useWorkspace();
+  const workspaceId = currentId ?? '';
   const { message } = AntdApp.useApp();
-  const { data, loading, error, reload } = useApiData<ScheduleResponse>('/api/schedule');
+  const { data, loading, error, reload } = useApiData<ScheduleResponse>(`/api/schedule?workspace_id=${encodeURIComponent(workspaceId)}`);
   const [pendingId, setPendingId] = useState('');
   const [rescheduleItem, setRescheduleItem] = useState<ScheduleListItem | null>(null);
   const [withdrawItem, setWithdrawItem] = useState<ScheduleListItem | null>(null);
@@ -120,7 +123,7 @@ export function SchedulePage() {
           return <Card key={group.key} title={<Space size={10}><span className="index-no">{group.no}</span>{group.title}<span className="mono-label">{items.length}</span></Space>} variant="borderless" className="schedule-column">
             <Text type="secondary" className="small-text column-hint">{group.hint}</Text>
             {items.length ? <Flex vertical gap={10}>{items.map(item => <Card key={item.id} size="small" className="schedule-item">
-              <Flex justify="space-between" align="flex-start" gap={8}><Link to={`/review/${item.review_case_id}`}><Title level={5}>{item.title}</Title></Link><RiskBadge risk={item.risk_level} /></Flex>
+              <Flex justify="space-between" align="flex-start" gap={8}><Link to={workspacePath(workspaceId, `review/${item.review_case_id}`)}><Title level={5}>{item.title}</Title></Link><RiskBadge risk={item.risk_level} /></Flex>
               <Text type="secondary" className="schedule-summary">{item.proposal_summary}</Text>
               <Space className="schedule-meta"><StatusBadge status={item.status} /><Text type="secondary" className="small-text">{formatFullDate(item.schedule_at)}</Text></Space>
               {item.status === 'scheduled' && !item.approval_synced_at && <Text type="warning" className="small-text">等待同步到执行器，同步前不会执行</Text>}

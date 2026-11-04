@@ -4,13 +4,14 @@ import { parseJson } from '../domain/utils.js';
 
 type AuditRow = {
   id: string; entity_type: string; entity_id: string; action: string; actor: string;
-  before_json: string; after_json: string; trace_id: string; created_at: string;
+  before_json: string; after_json: string; trace_id: string; workspace_id: string | null; created_at: string;
 };
 
 export interface AuditQuery {
   entityType?: string | undefined;
   entityId?: string | undefined;
   action?: string | undefined;
+  workspaceId?: string | undefined;
   page: number;
   pageSize: number;
 }
@@ -21,10 +22,10 @@ export class AuditRepository {
 
   append(input: AuditEventRecord): void {
     this.db.prepare(`
-      INSERT INTO audit_events(id, entity_type, entity_id, action, actor, before_json, after_json, trace_id, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO audit_events(id, entity_type, entity_id, action, actor, before_json, after_json, trace_id, workspace_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(input.id, input.entity_type, input.entity_id, input.action, input.actor,
-      JSON.stringify(input.before), JSON.stringify(input.after), input.trace_id, input.created_at);
+      JSON.stringify(input.before), JSON.stringify(input.after), input.trace_id, input.workspace_id ?? null, input.created_at);
   }
 
   list(query: AuditQuery): { items: AuditEventRecord[]; total: number } {
@@ -33,6 +34,7 @@ export class AuditRepository {
     if (query.entityType) { conditions.push('entity_type = ?'); params.push(query.entityType); }
     if (query.entityId) { conditions.push('entity_id = ?'); params.push(query.entityId); }
     if (query.action) { conditions.push('action LIKE ?'); params.push(`%${query.action}%`); }
+    if (query.workspaceId) { conditions.push('workspace_id = ?'); params.push(query.workspaceId); }
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const row = this.db.prepare(`SELECT COUNT(*) AS count FROM audit_events ${where}`).get(...params) as { count: number };
     const rows = this.db.prepare(`SELECT * FROM audit_events ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`)
@@ -46,8 +48,10 @@ export class AuditRepository {
     return rows.map((item) => this.map(item));
   }
 
-  recent(limit = 8): AuditEventRecord[] {
-    const rows = this.db.prepare('SELECT * FROM audit_events ORDER BY created_at DESC LIMIT ?').all(limit) as AuditRow[];
+  recent(limit = 8, workspaceId?: string): AuditEventRecord[] {
+    const rows = (workspaceId
+      ? this.db.prepare('SELECT * FROM audit_events WHERE workspace_id = ? ORDER BY created_at DESC LIMIT ?').all(workspaceId, limit)
+      : this.db.prepare('SELECT * FROM audit_events ORDER BY created_at DESC LIMIT ?').all(limit)) as AuditRow[];
     return rows.map((item) => this.map(item));
   }
 
@@ -55,7 +59,8 @@ export class AuditRepository {
     return {
       id: row.id, entity_type: row.entity_type, entity_id: row.entity_id, action: row.action,
       actor: row.actor, before: parseJson<unknown>(row.before_json, null),
-      after: parseJson<unknown>(row.after_json, null), trace_id: row.trace_id, created_at: row.created_at,
+      after: parseJson<unknown>(row.after_json, null), trace_id: row.trace_id,
+      workspace_id: row.workspace_id, created_at: row.created_at,
     };
   }
 }

@@ -1,4 +1,4 @@
-import type { CaseStatus, DecisionType, RiskLevel, Role, ScheduleStatus } from '@gatehouse/contract';
+import type { CaseStatus, DecisionType, RiskLevel, Role, ScheduleStatus, Source } from '@gatehouse/contract';
 
 export const statusLabels: Record<CaseStatus | ScheduleStatus, string> = {
   pending_review: '待复核', info_requested: '待补充', approved: '已批准', rejected: '已驳回',
@@ -29,6 +29,9 @@ export const actionLabels: Record<string, string> = {
   'execution.started': '执行已启动', 'execution.dispatched': '执行已派发', 'execution.finished': '执行已完成', 'execution.failed': '执行失败',
   'approval.invalidated': '批准已失效', 'approval.expired': '授权已过期', 'plugin.sync.failed': '执行器同步失败',
   'settings.updated': '系统配置已更新',
+  'workspace.created': '工作区已创建', 'workspace.updated': '工作区已更新', 'workspace.disabled': '工作区已停用',
+  'repository.created': '仓库已添加', 'repository.validated': '仓库检查完成', 'repository.description_confirmed': '仓库描述已确认',
+  'workspaces.synced': '工作区配置已同步', 'routing.reassigned': '工作区已改派',
 };
 
 export function formatDate(value: string | null | undefined, withSeconds = false): string {
@@ -63,5 +66,8 @@ export function shortHash(value: string): string {
   return `${value.slice(0, 13)}…${value.slice(-8)}`;
 }
 
-export function sourceLabel(source: 'feishu' | 'github'): string { return source === 'feishu' ? '飞书' : 'GitHub'; }
+export const sourceLabels: Record<Source, string> = {
+  feishu: '飞书', github: 'GitHub', gitlab: 'GitLab', gitea: 'Gitea', webhook: 'Webhook', manual: '人工录入',
+};
+export function sourceLabel(source: Source): string { return sourceLabels[source]; }
 
