@@ -39,7 +39,8 @@ apps/web/src/          React 控制台、页面、组件、API 客户端和样�
 apps/web/tests/        Web 单元测试
 packages/contract/src/ 前后端共享协议、Zod schema、签名与事件类型
 scripts/               本地工具、浏览器冒烟和提交信息校验
-docs/                  架构、审批、插件集成、数据模型和验收文档
+docs/                  已落地的架构、审批、插件集成、数据模型和验收文档
+plans/                 本地开发计划文档，仅保存在开发机，不纳入 Git
 data/                  本地 SQLite 数据，已被 .gitignore 忽略
 ```
 
@@ -84,6 +85,12 @@ pnpm commit:check  # 校验当前 HEAD 的提交信息
 - 异步操作必须有 loading、empty、error 和成功反馈；审批、排期、执行等高风险操作要有明确确认和可读结果。
 - 权限控制不能只依赖前端隐藏按钮；服务端必须再次校验。
 - 新页面优先复用 `AppShell`、通用 UI 组件和 contract 类型，并按项目现有方式做页面级懒加载。
+
+### 计划文档
+
+- 后续开发、实施、重构和迁移计划统一写入仓库根目录的 `plans/`。
+- `plans/` 已被 `.gitignore` 排除，计划文档不得提交、推送或复制到 `docs/`。
+- `docs/` 只保留已落地、可供交付和运维使用的正式文档。
 
 ### 数据与安全
 
