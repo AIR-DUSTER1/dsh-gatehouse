@@ -6,7 +6,6 @@ import type {
   RepositoryDiscovery,
   RoutingReassignInput,
   RoutingDecisionRecord,
-  Role,
   User,
   WorkspaceCreateInput,
   WorkspaceListItem,
@@ -22,7 +21,7 @@ import type { PluginClient, PluginWorkspaceSyncWorkspace } from '../plugin/plugi
 import type { AuditService } from '../audit/audit-service.js';
 import { DomainError, NotFoundError } from './errors.js';
 import { newId, nowIso, stableHash } from './utils.js';
-import { requireRole } from '../auth.js';
+import { requirePermission } from '../auth.js';
 
 const KNOWN_PUBLIC_GIT_HOSTS = new Set(['github.com', 'api.github.com', 'gitlab.com', 'bitbucket.org', 'api.bitbucket.org']);
 const PRIVATE_IPV4 = [
@@ -96,7 +95,7 @@ export class WorkspaceService {
   }
 
   create(input: WorkspaceCreateInput, user: User, traceId: string, now = new Date()): WorkspaceListItem {
-    requireRole(user, ['admin']);
+    requirePermission(user, 'workspace.manage');
     const at = nowIso(now);
     const workspaceId = newId('workspace');
     const workspace: WorkspaceRecord = {
@@ -129,7 +128,7 @@ export class WorkspaceService {
 
   addRepository(workspaceId: string, input: RepositoryConfigInput,
     user: User, traceId: string, now = new Date()): WorkspaceRepositoryRecord {
-    requireRole(user, ['admin']);
+    requirePermission(user, 'repository.manage');
     const workspace = this.requireAccess(user, workspaceId);
     if (workspace.status === 'disabled') {
       throw new DomainError('WORKSPACE_DISABLED', '工作区已停用，不能新增仓库', '先启用工作区或选择其他工作区', 409);
@@ -150,7 +149,7 @@ export class WorkspaceService {
 
   update(workspaceId: string, input: { name?: string; description?: string }, user: User, traceId: string,
     now = new Date()): WorkspaceRecord {
-    requireRole(user, ['admin']);
+    requirePermission(user, 'workspace.manage');
     const current = this.requireAccess(user, workspaceId);
     const at = nowIso(now);
     const next: WorkspaceRecord = {
@@ -173,7 +172,7 @@ export class WorkspaceService {
   }
 
   async validateRepository(repositoryId: string, user: User, traceId: string, now = new Date()): Promise<RepositoryDiscovery> {
-    requireRole(user, ['admin', 'reviewer']);
+    requirePermission(user, 'repository.manage');
     const repository = this.requireRepository(repositoryId);
     this.requireAccess(user, repository.workspace_id);
     const at = nowIso(now);
@@ -197,7 +196,7 @@ export class WorkspaceService {
   }
 
   async describeRepository(repositoryId: string, user: User, traceId: string, now = new Date()): Promise<RepositoryDescriptionSuggestion> {
-    requireRole(user, ['admin', 'reviewer']);
+    requirePermission(user, 'repository.manage');
     const repository = this.requireRepository(repositoryId);
     this.requireAccess(user, repository.workspace_id);
     const suggestion = await this.plugin.describeRepository(this.repositoryPayload(repository, traceId));
@@ -211,7 +210,7 @@ export class WorkspaceService {
 
   confirmDescription(repositoryId: string, input: RepositoryDescriptionConfirmation, user: User, traceId: string,
     now = new Date()): WorkspaceRepositoryRecord {
-    requireRole(user, ['admin']);
+    requirePermission(user, 'repository.manage');
     const repository = this.requireRepository(repositoryId);
     this.requireAccess(user, repository.workspace_id);
     const at = nowIso(now);
@@ -259,7 +258,7 @@ export class WorkspaceService {
   async syncWorkspaces(user: User, traceId: string, now = new Date()): Promise<{
     applied: number; disabled: number; config_version: number; config_hash: string; replayed: boolean;
   }> {
-    requireRole(user, ['admin']);
+    requirePermission(user, 'workspace.manage');
     const workspaces = this.workspaces.list(user);
     const version = Math.max(0, ...this.workspaces.bindings().map((binding) => binding.config_version)) + 1;
     const payloadWorkspaces: PluginWorkspaceSyncWorkspace[] = [];
@@ -319,7 +318,7 @@ export class WorkspaceService {
   }
 
   async disable(workspaceId: string, user: User, traceId: string, now = new Date()): Promise<WorkspaceRecord> {
-    requireRole(user, ['admin']);
+    requirePermission(user, 'workspace.manage');
     const workspace = this.requireAccess(user, workspaceId);
     const at = nowIso(now);
     transaction(this.db, () => {
@@ -336,7 +335,7 @@ export class WorkspaceService {
 
   async reassignProposal(proposalId: string, input: RoutingReassignInput, user: User, traceId: string,
     now = new Date()): Promise<void> {
-    requireRole(user, ['reviewer', 'admin']);
+    requirePermission(user, 'review.reassign');
     const proposal = this.db.prepare('SELECT * FROM proposals WHERE id = ?').get(proposalId) as {
       id: string; review_case_id: string; workspace_id: string | null; repository_id: string | null;
       workspace_binding_hash: string | null; status: string;
@@ -417,13 +416,13 @@ export class WorkspaceService {
   }
 
   members(workspaceId: string, user: User): Array<{ user_id: string }> {
-    requireRole(user, ['admin']);
+    requirePermission(user, 'member.manage');
     this.requireAccess(user, workspaceId);
     return this.workspaces.memberIds(workspaceId).map((userId) => ({ user_id: userId }));
   }
 
   addMember(workspaceId: string, userId: string, user: User, traceId: string, now = new Date()): void {
-    requireRole(user, ['admin']);
+    requirePermission(user, 'member.manage');
     this.requireAccess(user, workspaceId);
     const at = nowIso(now);
     this.workspaces.addMember(workspaceId, userId, at);
@@ -434,7 +433,7 @@ export class WorkspaceService {
   }
 
   removeMember(workspaceId: string, userId: string, user: User, traceId: string, now = new Date()): void {
-    requireRole(user, ['admin']);
+    requirePermission(user, 'member.manage');
     this.requireAccess(user, workspaceId);
     const at = nowIso(now);
     this.workspaces.removeMember(workspaceId, userId);
@@ -649,8 +648,4 @@ export class WorkspaceService {
     const text = error instanceof Error ? error.message : String(error);
     return text.replace(/\b(?:gh[pousr]_|glpat-|Bearer\s+)[A-Za-z0-9._-]+/g, '[redacted]').slice(0, 500);
   }
-}
-
-export function roleMayViewWorkspace(role: Role): boolean {
-  return role === 'viewer' || role === 'reviewer' || role === 'admin';
 }

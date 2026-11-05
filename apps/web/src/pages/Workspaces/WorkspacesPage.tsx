@@ -13,7 +13,7 @@ import type { RepositoryDescriptionSuggestion, RepositoryDiscovery, RepositoryPr
 import { api, ApiError } from '../../api/client';
 import { useAuth } from '../../hooks/useAuth';
 import { useWorkspace, workspacePath } from '../../hooks/useWorkspace';
-import { formatFullDate } from '../../lib/format';
+import { formatFullDate, hasPermission } from '../../lib/format';
 import { Badge, ErrorState, LoadingState, PageHeader } from '../../components/ui';
 import type {
   RepositoryConfirmationResponse,
@@ -85,7 +85,7 @@ export function WorkspacesPage() {
   const [memberSaving, setMemberSaving] = useState(false);
   const [repositoryForm] = Form.useForm<RepositoryForm>();
   const [descriptionForm] = Form.useForm<DescriptionForm>();
-  const canManage = user?.role === 'admin';
+  const canManage = hasPermission(user, 'workspace.manage');
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -247,10 +247,10 @@ export function WorkspacesPage() {
     try {
       const [memberResponse, settings] = await Promise.all([
         api<{ items: User[] }>(`/api/workspaces/${workspace.id}/members`),
-        api<{ users: User[] }>('/api/settings'),
+        api<{ items: User[] }>('/api/users/options'),
       ]);
       setMembers(memberResponse.items);
-      setAllUsers(settings.users);
+      setAllUsers(settings.items);
     } catch (reason) {
       message.error(reason instanceof ApiError ? reason.body.error.message : '成员加载失败');
     }
@@ -396,7 +396,7 @@ export function WorkspacesPage() {
         <Flex vertical gap={8} className="workspace-member-list">
           {members.map(member => <Flex key={member.id} align="center" gap={10} className="workspace-member-row">
             <span className="member-avatar">{member.name.slice(-2)}</span>
-            <div className="workspace-member-copy"><Text strong>{member.name}</Text><Text type="secondary">{member.email} · {member.role}</Text></div>
+            <div className="workspace-member-copy"><Text strong>{member.name}</Text><Text type="secondary">{member.email} · {member.role_name}</Text></div>
             <Popconfirm title="移除该成员？" onConfirm={() => void removeMember(member.id)}><Button size="small" danger loading={memberSaving}>移除</Button></Popconfirm>
           </Flex>)}
         </Flex>

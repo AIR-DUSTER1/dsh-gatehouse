@@ -14,7 +14,7 @@ const auditQuerySchema = z.object({
 
 export async function registerAuditRoutes(app: FastifyInstance, context: AppContext): Promise<void> {
   app.get('/api/audit', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context);
     const query = auditQuerySchema.parse(request.query);
     context.workspaceService.requireAccess(user, query.workspace_id);
     const result = context.query.listAudit({

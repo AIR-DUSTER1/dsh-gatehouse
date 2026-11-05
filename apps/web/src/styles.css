@@ -694,3 +694,42 @@ code, .ant-typography code {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* ---------- 访问控制 / 账号安全 ---------- */
+.table-toolbar { margin-bottom: 14px; }
+.invite-link-panel { display: flex; flex-direction: column; gap: 10px; padding: 18px; border: 1px solid var(--line); background: var(--paper); }
+.invite-link-icon { font-size: 28px; color: var(--signal); }
+.role-list { display: flex; flex-direction: column; gap: 8px; }
+.role-list-item {
+  width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px; border: 1px solid var(--line);
+  background: transparent; color: var(--ink); text-align: left; cursor: pointer; font: inherit;
+}
+.role-list-item:hover { border-color: var(--ink); background: var(--paper); }
+.role-list-item.is-active { border-color: var(--signal); background: rgba(232, 72, 12, 0.05); box-shadow: inset 3px 0 0 var(--signal); }
+.role-list-icon { display: grid; place-items: center; width: 30px; height: 30px; flex: none; border: 1px solid var(--line); background: var(--surface); }
+.role-list-copy { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 2px; }
+.role-list-copy strong { font-weight: 650; }
+.role-list-copy small { color: var(--ink-soft); font-family: var(--font-mono); font-size: 10px; }
+.role-protected-note { display: flex; align-items: center; gap: 8px; margin: 8px 0 16px; padding: 9px 12px; border: 1px solid var(--line); background: var(--paper); color: var(--ink-soft); font-size: 12px; }
+.permission-groups { display: flex; flex-direction: column; gap: 14px; }
+.permission-group { border: 1px solid var(--line); }
+.permission-group-head { display: flex; justify-content: space-between; padding: 9px 12px; border-bottom: 1px solid var(--line); background: var(--paper); }
+.permission-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.permission-option { display: flex; gap: 9px; align-items: flex-start; min-height: 58px; padding: 11px 12px; border-right: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); cursor: pointer; }
+.permission-option:nth-child(2n) { border-right: 0; }
+.permission-option:hover { background: rgba(232, 72, 12, 0.04); }
+.permission-option.is-disabled { cursor: default; opacity: 0.72; }
+.permission-option > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.permission-option small { color: var(--ink-soft); font-size: 10px; line-height: 1.35; word-break: break-word; }
+.permission-create-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.permission-create-grid .ant-checkbox-wrapper { margin-inline-start: 0; padding: 7px 9px; border: 1px solid var(--line); }
+.security-facts { display: grid; gap: 10px; margin-top: 22px; }
+.security-facts span { display: flex; justify-content: space-between; gap: 16px; padding-bottom: 9px; border-bottom: 1px solid var(--line-soft); }
+.security-facts small { color: var(--ink-soft); text-align: right; }
+.auth-link-page { min-height: 100vh; display: grid; place-items: center; padding: 20px; background: var(--paper); }
+.auth-link-card { width: min(100%, 480px); padding: 8px; }
+@media (max-width: 680px) {
+  .permission-grid, .permission-create-grid { grid-template-columns: 1fr; }
+  .permission-option { border-right: 0; }
+  .auth-link-page { padding: 12px; align-items: start; padding-top: 48px; }
+}

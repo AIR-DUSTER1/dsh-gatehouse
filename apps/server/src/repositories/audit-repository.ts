@@ -4,7 +4,7 @@ import { parseJson } from '../domain/utils.js';
 
 type AuditRow = {
   id: string; entity_type: string; entity_id: string; action: string; actor: string;
-  before_json: string; after_json: string; trace_id: string; workspace_id: string | null; created_at: string;
+  actor_user_id: string | null; before_json: string; after_json: string; trace_id: string; workspace_id: string | null; created_at: string;
 };
 
 export interface AuditQuery {
@@ -22,10 +22,9 @@ export class AuditRepository {
 
   append(input: AuditEventRecord): void {
     this.db.prepare(`
-      INSERT INTO audit_events(id, entity_type, entity_id, action, actor, before_json, after_json, trace_id, workspace_id, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(input.id, input.entity_type, input.entity_id, input.action, input.actor,
-      JSON.stringify(input.before), JSON.stringify(input.after), input.trace_id, input.workspace_id ?? null, input.created_at);
+      INSERT INTO audit_events(id, entity_type, entity_id, action, actor, actor_user_id, before_json, after_json, trace_id, workspace_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(input.id, input.entity_type, input.entity_id, input.action, input.actor, input.actor_user_id ?? null, JSON.stringify(input.before), JSON.stringify(input.after), input.trace_id, input.workspace_id ?? null, input.created_at);
   }
 
   list(query: AuditQuery): { items: AuditEventRecord[]; total: number } {
@@ -58,7 +57,7 @@ export class AuditRepository {
   private map(row: AuditRow): AuditEventRecord {
     return {
       id: row.id, entity_type: row.entity_type, entity_id: row.entity_id, action: row.action,
-      actor: row.actor, before: parseJson<unknown>(row.before_json, null),
+      actor: row.actor, actor_user_id: row.actor_user_id, before: parseJson<unknown>(row.before_json, null),
       after: parseJson<unknown>(row.after_json, null), trace_id: row.trace_id,
       workspace_id: row.workspace_id, created_at: row.created_at,
     };

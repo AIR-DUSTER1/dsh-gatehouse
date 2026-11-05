@@ -8,7 +8,7 @@ import { DomainError, NotFoundError } from '../../domain/errors.js';
 
 export async function registerScheduleRoutes(app: FastifyInstance, context: AppContext): Promise<void> {
   app.get('/api/schedule', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context);
     const { workspace_id: workspaceId } = z.object({ workspace_id: z.string().min(1) }).parse(request.query);
     context.workspaceService.requireAccess(user, workspaceId);
     const items = context.query.listSchedules(workspaceId);
@@ -26,7 +26,7 @@ export async function registerScheduleRoutes(app: FastifyInstance, context: AppC
   });
 
   app.post('/api/schedule/:id/pause', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context);
     const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
     requireScheduleAccess(context, user, id);
     const trace = traceId(request);
@@ -35,7 +35,7 @@ export async function registerScheduleRoutes(app: FastifyInstance, context: AppC
   });
 
   app.post('/api/schedule/:id/resume', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context);
     const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
     requireScheduleAccess(context, user, id);
     const trace = traceId(request);
@@ -44,7 +44,7 @@ export async function registerScheduleRoutes(app: FastifyInstance, context: AppC
   });
 
   app.post('/api/schedule/:id/reschedule', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context);
     const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
     requireScheduleAccess(context, user, id);
     const input = scheduleChangeInputSchema.parse(request.body);
@@ -55,7 +55,7 @@ export async function registerScheduleRoutes(app: FastifyInstance, context: AppC
   });
 
   app.post('/api/schedule/:id/withdraw', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context);
     const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
     requireScheduleAccess(context, user, id);
     const input = scheduleWithdrawInputSchema.parse(request.body);
@@ -66,7 +66,7 @@ export async function registerScheduleRoutes(app: FastifyInstance, context: AppC
   });
 
   app.post('/api/schedule/:id/retry-execution', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context);
     const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
     requireScheduleAccess(context, user, id);
     const trace = traceId(request);

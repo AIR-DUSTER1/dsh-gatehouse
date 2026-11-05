@@ -1,3 +1,4 @@
+import { PERMISSIONS, type User } from '@gatehouse/contract';
 import type { Database } from '../db/database.js';
 import { transaction } from '../db/database.js';
 import type { ScheduleRepository } from '../repositories/schedule-repository.js';
@@ -10,6 +11,12 @@ import type { AuditService } from '../audit/audit-service.js';
 import type { OutboxDispatcher } from './outbox-dispatcher.js';
 import { newId, nowIso } from '../domain/utils.js';
 import type { WorkspaceService } from '../domain/workspace-service.js';
+
+const SYSTEM_USER: User = {
+  id: 'system', name: 'system', email: 'system@local', role: 'admin', role_id: 'role_admin', role_name: '管理员',
+  status: 'active', permissions: [...PERMISSIONS], workspace_ids: [], last_login_at: null,
+  password_changed_at: null, created_at: '', updated_at: '',
+};
 
 /** Persistent scheduler. Every wake reads due work from SQLite; no in-memory timer is authoritative. */
 export class SchedulerService {
@@ -83,7 +90,7 @@ export class SchedulerService {
       this.cases.setStatus(reviewCase.id, 'pending_review', at);
       return false;
     }
-    const workspace = this.workspaceService.detail({ id: 'system', role: 'admin', name: 'system', email: 'system@local' }, workspaceId);
+    const workspace = this.workspaceService.detail(SYSTEM_USER, workspaceId);
     if (workspace.status !== 'active') {
       this.grants.revoke(grant.id);
       this.schedules.cancel(schedule.id, '目标工作区未启用', at);

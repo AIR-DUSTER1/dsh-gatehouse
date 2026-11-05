@@ -54,9 +54,30 @@ AND schedule_at <= now
 
 跨进程副作用的事务性 outbox。状态为 `pending | inflight | delivered | dead`，记录尝试次数、下次重试时间、最大次数和最后错误。
 
-### users / settings
+### users
 
-本地账号与角色；运行期最大并发配置。
+本地账号。保存规范化的唯一邮箱、显示名称、角色关联、密码哈希、账号状态、最后登录、密码更新时间和会话版本。账号只停用，不硬删除；停用或密码变化会递增 `session_version`，使旧 JWT 立即失效。
+
+### roles / permissions / role_permissions
+
+数据库驱动的 RBAC：
+
+- 内置角色为 `viewer`、`reviewer`、`admin`，也支持自定义角色。
+- `admin` 权限由完整权限目录计算，不能编辑或停用。
+- 非管理员角色不能拥有管理员保留权限。
+- 角色权限变化在下一次请求立即生效。
+
+### user_action_tokens
+
+邀请和密码重置的一次性令牌。数据库只保存 SHA-256 哈希、用途、过期时间、撤销时间和消费时间；明文令牌只在签发响应中出现一次。
+
+### auth_events
+
+认证安全事件，记录登录成功/失败、邀请接受、密码修改和重置。不保存明文密码、令牌或邮箱。
+
+### settings
+
+运行期最大并发等系统配置。
 
 ## 关系
 
@@ -66,6 +87,11 @@ proposals    1 ── N review_decisions
 proposals    1 ── 0..1 approval_grants
 proposals    1 ── 0..1 schedules
 review_cases 1 ── N audit_events（逻辑关联）
+roles        1 ── N users
+roles        1 ── N role_permissions
+permissions  1 ── N role_permissions
+users        1 ── N user_action_tokens
+users        1 ── N auth_events
 ```
 
 ## 时间与哈希

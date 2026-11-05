@@ -1,14 +1,14 @@
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import type { AppContext } from '../../app.js';
-import { requestUser, requireRole } from '../../auth.js';
+import { requestUser, requirePermission } from '../../auth.js';
 import { traceId } from '../request-context.js';
 
 const settingsSchema = z.object({ max_concurrency: z.number().int().min(1).max(20) });
 
 export async function registerSettingsRoutes(app: FastifyInstance, context: AppContext): Promise<void> {
   app.get('/api/settings', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context);
     const maxConcurrency = Number.parseInt(context.settings.get('max_concurrency') ?? '', 10) || context.config.scheduleMaxConcurrency;
     const workspaces = context.workspaceService.list(user);
     const monitoredRepositories = workspaces.flatMap((workspace) => workspace.repositories.map((repository) => ({
@@ -22,14 +22,13 @@ export async function registerSettingsRoutes(app: FastifyInstance, context: AppC
       monitored_repository: monitoredRepositories[0]?.repository_key ?? null,
       monitored_repositories: monitoredRepositories,
       session_ttl_seconds: context.config.sessionTtlSeconds,
-      users: context.users.list(),
       pending_outbox: context.outbox.pendingCount(),
     };
   });
 
   app.put('/api/settings', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
-    requireRole(user, ['admin']);
+    const user = requestUser(request, context);
+    requirePermission(user, 'settings.manage');
     const body = settingsSchema.parse(request.body);
     const trace = traceId(request);
     const at = new Date().toISOString();

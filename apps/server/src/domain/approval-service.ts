@@ -10,7 +10,7 @@ import type { OutboxRepository } from '../repositories/outbox-repository.js';
 import type { AuditService } from '../audit/audit-service.js';
 import { DomainError, NotFoundError } from './errors.js';
 import { newId, nowIso, stableHash } from './utils.js';
-import { requireRole } from '../auth.js';
+import { requirePermission } from '../auth.js';
 import type { PluginDecisionRequest } from '../plugin/plugin-client.js';
 import type { WorkspaceService } from './workspace-service.js';
 
@@ -43,7 +43,7 @@ export class ApprovalService {
     traceId: string;
     now?: Date;
   }): DecisionResult {
-    requireRole(input.user, ['reviewer', 'admin']);
+    requirePermission(input.user, 'review.decide');
     if (!input.idempotencyKey.trim()) {
       throw new DomainError('IDEMPOTENCY_KEY_REQUIRED', '缺少幂等键', '为本次审批生成唯一幂等键后重试', 400);
     }
@@ -123,7 +123,7 @@ export class ApprovalService {
       this.proposals.setStatus(proposal.id, nextStatus, at);
       this.cases.setStatus(reviewCase.id, nextStatus, at);
       this.audit.record({
-        entityType: 'review_case', entityId: reviewCase.id, action: 'decision.recorded', actor: input.user.name,
+        entityType: 'review_case', entityId: reviewCase.id, action: 'decision.recorded', actor: input.user.name, actorUserId: input.user.id,
         before: { status: proposal.status }, after: { status: nextStatus, decision: input.decision.decision, comment: input.decision.comment },
         traceId: input.traceId, at, workspaceId,
       });
@@ -150,13 +150,13 @@ export class ApprovalService {
           created_at: existingSchedule?.created_at ?? at, updated_at: at,
         });
         this.audit.record({
-          entityType: 'review_case', entityId: reviewCase.id, action: existingGrant ? 'grant.reactivated' : 'grant.created', actor: input.user.name,
+          entityType: 'review_case', entityId: reviewCase.id, action: existingGrant ? 'grant.reactivated' : 'grant.created', actor: input.user.name, actorUserId: input.user.id,
           before: existingGrant ? { status: existingGrant.status } : null,
           after: { grant_id: grant.id, schedule_at: scheduleAt, expires_at: expiresAt },
           traceId: input.traceId, at, workspaceId,
         });
         this.audit.record({
-          entityType: 'review_case', entityId: reviewCase.id, action: existingSchedule ? 'schedule.reapproved' : 'schedule.created', actor: input.user.name,
+          entityType: 'review_case', entityId: reviewCase.id, action: existingSchedule ? 'schedule.reapproved' : 'schedule.created', actor: input.user.name, actorUserId: input.user.id,
           before: existingSchedule ? { status: existingSchedule.status } : null,
           after: { schedule_at: scheduleAt, status: 'scheduled' }, traceId: input.traceId, at, workspaceId,
         });

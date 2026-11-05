@@ -4,11 +4,12 @@ import { Avatar, Button, Drawer, Dropdown, Flex, Grid, Layout, Menu, Select, Spa
 import {
   ApartmentOutlined, AuditOutlined, BarChartOutlined, BellOutlined, CalendarOutlined, ControlOutlined,
   DashboardOutlined, DownOutlined, GithubOutlined, GitlabOutlined, LogoutOutlined, MenuOutlined,
-  RocketOutlined, SafetyCertificateOutlined, SettingOutlined,
+  RocketOutlined, SafetyCertificateOutlined, SettingOutlined, TeamOutlined, UserSwitchOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../hooks/useAuth';
 import { useWorkspace, workspacePath, workspaceSuffix } from '../hooks/useWorkspace';
-import { roleLabels } from '../lib/format';
+import type { User } from '@gatehouse/contract';
+import { hasPermission } from '../lib/format';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -27,10 +28,12 @@ function workspaceItems(workspaceId: string) {
   ];
 }
 
-function globalItemsFor(role: string | undefined) {
+function globalItemsFor(user: User | null) {
   return [
-    ...(role === 'admin' ? [{ key: '/analytics', icon: <BarChartOutlined />, label: navLabel('06', '全局统计') }] : []),
+    ...(hasPermission(user, 'analytics.global') ? [{ key: '/analytics', icon: <BarChartOutlined />, label: navLabel('06', '全局统计') }] : []),
     { key: '/workspaces', icon: <ApartmentOutlined />, label: navLabel('07', '工作区') },
+    ...(hasPermission(user, 'user.manage') ? [{ key: '/access/users', icon: <TeamOutlined />, label: navLabel('09', '用户管理') }] : []),
+    ...(hasPermission(user, 'role.manage') ? [{ key: '/access/roles', icon: <UserSwitchOutlined />, label: navLabel('10', '角色管理') }] : []),
   ];
 }
 const settingsItem = { key: '/settings', icon: <SettingOutlined />, label: navLabel('08', '系统设置') };
@@ -46,7 +49,10 @@ const titles: Record<string, { title: string; section: string }> = {
 function routeTitle(pathname: string) {
   if (pathname === '/analytics') return { title: '全局统计', section: '跨工作区总览' };
   if (pathname === '/workspaces') return { title: '工作区与仓库', section: '接入配置' };
-  if (pathname === '/settings') return { title: '系统设置', section: '连接与权限' };
+  if (pathname === '/settings') return { title: '系统设置', section: '连接与调度' };
+  if (pathname === '/access/users') return { title: '用户管理', section: '访问控制' };
+  if (pathname === '/access/roles') return { title: '角色管理', section: '访问控制' };
+  if (pathname === '/account/security') return { title: '账号安全', section: '个人账号' };
   if (pathname.includes('/review/')) return { title: '需求详情', section: '人工决策' };
   const suffix = workspaceSuffix(pathname).split('/')[0] ?? '';
   return titles[suffix] ?? { title: '工作区', section: 'Gatehouse' };
@@ -170,7 +176,7 @@ export function AppShell() {
       <Navigation onNavigate={() => setDrawerOpen(false)} />
       <div className="sidebar-system sidebar-global">
         <Text className="nav-caption">全局</Text>
-        <Menu theme="dark" mode="inline" selectedKeys={[location.pathname]} items={globalItemsFor(user?.role)}
+        <Menu theme="dark" mode="inline" selectedKeys={[location.pathname]} items={globalItemsFor(user)}
           onClick={({ key }) => { navigate(key); setDrawerOpen(false); }} />
       </div>
       <div className="sidebar-system">
@@ -181,7 +187,7 @@ export function AppShell() {
         <div className="runtime-status"><span className={`lamp ${current?.status === 'active' ? 'on' : 'idle'}`} /><div><Text>{current?.status === 'active' ? '当前工作区运行正常' : '工作区等待配置'}</Text><Text type="secondary">同步、授权与审计已隔离</Text></div></div>
         <Flex align="center" gap={9} className="signed-user">
           <Avatar className="person-avatar">{user?.name?.slice(-2)}</Avatar>
-          <div><Text strong>{user?.name}</Text><Text type="secondary">{user ? roleLabels[user.role] : ''}</Text></div>
+          <div><Text strong>{user?.name}</Text><Text type="secondary">{user?.role_name ?? ''}</Text></div>
           <Button type="text" className="logout-button" icon={<LogoutOutlined />} onClick={() => { logout(); navigate('/login'); }} />
         </Flex>
       </div>

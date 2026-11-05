@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Alert, App as AntdApp, Button, Card, Col, Descriptions, Flex, Form, InputNumber, Row, Space, Table, Tag, Typography } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
-import { ApiOutlined, DatabaseOutlined, KeyOutlined, ReloadOutlined, SaveOutlined, SafetyCertificateOutlined, TeamOutlined } from '@ant-design/icons';
-import type { User } from '@gatehouse/contract';
+import { Alert, App as AntdApp, Button, Card, Col, Descriptions, Flex, Form, InputNumber, Row, Space, Tag, Typography } from 'antd';
+import { ApiOutlined, DatabaseOutlined, KeyOutlined, ReloadOutlined, SaveOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import type { SettingsResponse } from '../../types/api';
 import { api, ApiError } from '../../api/client';
 import { useApiData } from '../../hooks/useApiData';
 import { useAuth } from '../../hooks/useAuth';
-import { roleLabels } from '../../lib/format';
+import { hasPermission } from '../../lib/format';
 import { ErrorState, LoadingState, PageHeader } from '../../components/ui';
 
 const { Text, Title } = Typography;
@@ -21,7 +19,7 @@ export function SettingsPage() {
   useEffect(() => { if (data) setMaxConcurrency(data.max_concurrency); }, [data]);
   if (loading) return <LoadingState label="正在读取系统配置…" />;
   if (error || !data) return <ErrorState message={error?.message ?? '设置加载失败'} action={error?.body.error.action} onRetry={reload} />;
-  const canEdit = user?.role === 'admin';
+  const canEdit = hasPermission(user, 'settings.manage');
 
   const save = async () => {
     setSaving(true);
@@ -34,15 +32,9 @@ export function SettingsPage() {
     } finally { setSaving(false); }
   };
 
-  const columns: ColumnsType<User> = [
-    { title: '成员', dataIndex: 'name', render: (value, member) => <Space><span className="member-avatar">{value.slice(-2)}</span><div><Text strong>{value}</Text><br /><Text type="secondary" className="small-text">{member.email}</Text></div></Space> },
-    { title: '角色', dataIndex: 'role', width: 120, render: (value: User['role']) => <Tag color={value === 'admin' ? 'orange' : value === 'reviewer' ? 'blue' : 'default'}>{roleLabels[value]}</Tag> },
-    { title: '权限摘要', dataIndex: 'role', render: (value: User['role']) => value === 'admin' ? '审批、排期、系统配置' : value === 'reviewer' ? '审批、驳回、暂停与恢复排期' : '只读查看' },
-  ];
-
   return (
     <div className="page-stack">
-      <PageHeader eyebrow="SYSTEM / SETTINGS" title="系统设置" description="配置执行器连接、调度并发与项目成员权限。仓库和工作区在独立控制面管理。" actions={<Space><Button href="/workspaces">工作区与仓库</Button><Button icon={<ReloadOutlined />} onClick={reload}>刷新</Button></Space>} />
+      <PageHeader eyebrow="SYSTEM / SETTINGS" title="系统设置" description="配置执行器连接、调度并发与运行策略。用户和角色在访问控制中管理。" actions={<Space>{hasPermission(user, 'user.manage') && <Button href="/access/users">访问控制</Button>}<Button href="/workspaces">工作区与仓库</Button><Button icon={<ReloadOutlined />} onClick={reload}>刷新</Button></Space>} />
       <Row gutter={[14, 14]}>
         <Col xs={24} xl={12}>
           <Card variant="borderless" title={<Space><ApiOutlined />dsh-superagent 连接</Space>} extra={<Tag color="green">已连接</Tag>}>
@@ -72,10 +64,6 @@ export function SettingsPage() {
           </Card>
         </Col>
       </Row>
-      <Card variant="borderless" title={<Space><TeamOutlined />项目成员与权限</Space>} extra={<Tag>{data.users.length} 人</Tag>}>
-        <Alert className="settings-alert" type="warning" showIcon title="申请人不能批准自己的需求；viewer 仅可查看。" />
-        <Table rowKey="id" columns={columns} dataSource={data.users} pagination={false} size="middle" />
-      </Card>
       <Row gutter={[14, 14]}>
         <Col xs={24} lg={12}><Card variant="borderless"><Flex gap={12}><KeyOutlined className="settings-feature-icon" /><div><Title level={5}>密钥与签名</Title><Text type="secondary">会话密钥、事件 HMAC 和插件共享密钥全部通过环境变量注入，生产环境不得使用默认值。</Text></div></Flex></Card></Col>
         <Col xs={24} lg={12}><Card variant="borderless"><Flex gap={12}><SafetyCertificateOutlined className="settings-feature-icon" /><div><Title level={5}>审计不可变</Title><Text type="secondary">SQLite 触发器阻止更新和删除审计记录，所有审批动作保留 trace ID。</Text></div></Flex></Card></Col>

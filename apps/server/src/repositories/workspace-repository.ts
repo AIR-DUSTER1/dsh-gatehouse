@@ -3,7 +3,6 @@ import type {
   RepositoryProvider,
   RepositoryStatus,
   RoutingDecisionRecord,
-  Role,
   Source,
   User,
   WorkspaceListItem,
@@ -71,8 +70,8 @@ export interface RoutingDecisionInput {
 export class WorkspaceStore {
   constructor(private readonly db: Database) {}
 
-  list(user: Pick<User, 'id' | 'role'>): WorkspaceListItem[] {
-    const rows = user.role === 'admin'
+  list(user: Pick<User, 'id' | 'permissions'>): WorkspaceListItem[] {
+    const rows = user.permissions.includes('workspace.manage')
       ? this.db.prepare('SELECT * FROM workspaces ORDER BY created_at ASC').all() as WorkspaceRow[]
       : this.db.prepare(`
           SELECT w.* FROM workspaces w
@@ -220,8 +219,8 @@ export class WorkspaceStore {
     return this.routingDecision(id)!;
   }
 
-  canAccess(user: Pick<User, 'id' | 'role'>, workspaceId: string): boolean {
-    if (user.role === 'admin') return true;
+  canAccess(user: Pick<User, 'id' | 'permissions'>, workspaceId: string): boolean {
+    if (user.permissions.includes('workspace.manage')) return true;
     return !!this.db.prepare('SELECT 1 FROM workspace_memberships WHERE workspace_id = ? AND user_id = ?')
       .get(workspaceId, user.id);
   }
@@ -265,8 +264,4 @@ export class WorkspaceStore {
     }), capabilities: parseJson(row.capabilities_json, []), routing_keywords: parseJson(row.routing_keywords_json, []),
     exclusions: parseJson(row.exclusions_json, []) };
   }
-}
-
-export function workspaceRoleFor(user: Pick<User, 'role'>): Role {
-  return user.role;
 }

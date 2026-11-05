@@ -14,6 +14,9 @@ import { OutboxRepository } from './repositories/outbox-repository.js';
 import { PluginEventRepository } from './repositories/plugin-event-repository.js';
 import { SettingsRepository } from './repositories/settings-repository.js';
 import { UserRepository } from './repositories/user-repository.js';
+import { RoleRepository } from './repositories/role-repository.js';
+import { UserTokenRepository } from './repositories/user-token-repository.js';
+import { AuthEventRepository } from './repositories/auth-event-repository.js';
 import { AnalyticsRepository } from './repositories/analytics-repository.js';
 import { WorkspaceStore } from './repositories/workspace-repository.js';
 import { AuditService } from './audit/audit-service.js';
@@ -21,6 +24,8 @@ import { ApprovalService } from './domain/approval-service.js';
 import { ReviewQueryService } from './domain/review-query-service.js';
 import { PluginEventService } from './domain/plugin-event-service.js';
 import { WorkspaceService } from './domain/workspace-service.js';
+import { UserService } from './domain/user-service.js';
+import { RoleService } from './domain/role-service.js';
 import { HttpPluginClient, MockPluginClient, type PluginClient } from './plugin/plugin-client.js';
 import { OutboxDispatcher } from './schedule/outbox-dispatcher.js';
 import { SchedulerService } from './schedule/scheduler-service.js';
@@ -35,6 +40,8 @@ import { registerPluginEventRoutes } from './api/routes/plugin-event-routes.js';
 import { registerSettingsRoutes } from './api/routes/settings-routes.js';
 import { registerWorkspaceRoutes } from './api/routes/workspace-routes.js';
 import { registerAnalyticsRoutes } from './api/routes/analytics-routes.js';
+import { registerUserRoutes } from './api/routes/user-routes.js';
+import { registerRoleRoutes } from './api/routes/role-routes.js';
 import { traceId } from './api/request-context.js';
 
 export interface AppContext {
@@ -50,6 +57,11 @@ export interface AppContext {
   pluginEvents: PluginEventRepository;
   settings: SettingsRepository;
   users: UserRepository;
+  roles: RoleRepository;
+  userTokens: UserTokenRepository;
+  authEvents: AuthEventRepository;
+  userService: UserService;
+  roleService: RoleService;
   analytics: AnalyticsRepository;
   workspaceStore: WorkspaceStore;
   workspaceService: WorkspaceService;
@@ -86,17 +98,23 @@ export function createContext(config: AppConfig, pluginOverride?: PluginClient):
   const outbox = new OutboxRepository(db);
   const pluginEvents = new PluginEventRepository(db);
   const settings = new SettingsRepository(db);
-  const users = new UserRepository(db);
+  const roles = new RoleRepository(db);
+  const users = new UserRepository(db, roles);
+  const userTokens = new UserTokenRepository(db);
+  const authEvents = new AuthEventRepository(db);
   const analytics = new AnalyticsRepository(db);
   const workspaceStore = new WorkspaceStore(db);
   const audit = new AuditService(auditRepository);
   const plugin = pluginOverride ?? (config.pluginMode === 'http'
     ? new HttpPluginClient(config.pluginBaseUrl, config.pluginSharedSecret, config.pluginTimeoutMs)
     : new MockPluginClient());
-  ensureBootstrapAdmin(users, config);
+  ensureBootstrapAdmin(users, roles, config);
   const workspaceService = new WorkspaceService(db, workspaceStore, plugin, audit, config);
-  const adminIds = users.list().filter((user) => user.role === 'admin').map((user) => user.id);
-  for (const workspace of workspaceStore.list({ id: adminIds[0] ?? 'admin', role: 'admin' })) {
+  const userService = new UserService(db, users, roles, userTokens, authEvents, audit, workspaceStore, config);
+  const roleService = new RoleService(db, roles, audit);
+  const adminUsers = users.list().filter((user) => user.role === 'admin');
+  const adminIds = adminUsers.map((user) => user.id);
+  for (const workspace of adminUsers[0] ? workspaceStore.list(adminUsers[0]) : []) {
     for (const adminId of adminIds) workspaceStore.addMember(workspace.id, adminId, new Date().toISOString());
   }
   const approval = new ApprovalService(db, cases, proposals, decisions, grants, schedules, outbox, audit,
@@ -110,7 +128,7 @@ export function createContext(config: AppConfig, pluginOverride?: PluginClient):
     config.pluginMaxAttempts, workspaceService);
   return {
     config, db, cases, proposals, decisions, grants, schedules, auditRepository, outbox, pluginEvents,
-    settings, users, analytics, workspaceStore, workspaceService, audit, approval, query, eventIngest, plugin,
+    settings, users, roles, userTokens, authEvents, userService, roleService, analytics, workspaceStore, workspaceService, audit, approval, query, eventIngest, plugin,
     dispatcher, scheduler, scheduleControl,
   };
 }
@@ -151,6 +169,8 @@ export async function createApplication(options: CreateApplicationOptions = {}):
   await registerSettingsRoutes(app, context);
   await registerWorkspaceRoutes(app, context);
   await registerAnalyticsRoutes(app, context);
+  await registerUserRoutes(app, context);
+  await registerRoleRoutes(app, context);
 
   app.addHook('onClose', async () => {
     context.scheduler.stop();

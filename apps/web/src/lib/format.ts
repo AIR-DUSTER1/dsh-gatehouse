@@ -1,4 +1,4 @@
-import type { CaseStatus, DecisionType, RiskLevel, Role, ScheduleStatus, Source } from '@gatehouse/contract';
+import type { CaseStatus, DecisionType, PermissionCode, RiskLevel, ScheduleStatus, Source, User, UserStatus } from '@gatehouse/contract';
 
 export const statusLabels: Record<CaseStatus | ScheduleStatus, string> = {
   pending_review: '待复核', info_requested: '待补充', approved: '已批准', rejected: '已驳回',
@@ -19,7 +19,17 @@ export const statusExplain: Record<CaseStatus, string> = {
 };
 
 export const riskLabels: Record<RiskLevel, string> = { low: '低风险', medium: '中风险', high: '高风险', critical: '极高风险' };
-export const roleLabels: Record<Role, string> = { viewer: '只读成员', reviewer: '复核人', admin: '管理员' };
+export const permissionLabels: Record<PermissionCode, string> = {
+  'workspace.read': '查看工作区', 'workspace.manage': '管理工作区', 'member.manage': '管理工作区成员',
+  'repository.manage': '管理仓库', 'review.read': '查看复核', 'review.decide': '执行复核',
+  'review.reassign': '改派任务', 'schedule.read': '查看排期', 'schedule.control': '控制排期',
+  'execution.read': '查看交付', 'audit.read': '查看审计', 'analytics.global': '查看全局统计',
+  'settings.read': '查看设置', 'settings.manage': '管理系统设置', 'user.manage': '管理用户', 'role.manage': '管理角色',
+};
+export const userStatusLabels: Record<UserStatus, string> = { invited: '等待激活', active: '正常', disabled: '已停用' };
+export function hasPermission(user: Pick<User, 'permissions'> | null | undefined, permission: PermissionCode): boolean {
+  return Boolean(user && Array.isArray(user.permissions) && user.permissions.includes(permission));
+}
 export const decisionLabels: Record<DecisionType, string> = { approve: '批准并排期', reject: '驳回', request_info: '要求补充' };
 
 export const actionLabels: Record<string, string> = {

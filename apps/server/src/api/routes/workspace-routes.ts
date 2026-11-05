@@ -8,7 +8,7 @@ import {
   workspaceUpdateInputSchema,
 } from '@gatehouse/contract';
 import type { AppContext } from '../../app.js';
-import { requestUser, requireRole } from '../../auth.js';
+import { requestUser, requirePermission } from '../../auth.js';
 import { DomainError, NotFoundError } from '../../domain/errors.js';
 import { traceId } from '../request-context.js';
 
@@ -20,25 +20,25 @@ const descriptionConfirmationSchema = repositoryDescriptionInputSchema.extend({
 
 export async function registerWorkspaceRoutes(app: FastifyInstance, context: AppContext): Promise<void> {
   app.get('/api/workspaces', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context);
     return { items: context.workspaceService.list(user) };
   });
 
   app.post('/api/workspaces', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context);
     const input = workspaceCreateInputSchema.parse(request.body);
     const trace = traceId(request);
     return { workspace: context.workspaceService.create(input, user, trace), trace_id: trace };
   });
 
   app.get('/api/workspaces/:id', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context);
     const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
     return { workspace: context.workspaceService.detail(user, id) };
   });
 
   app.put('/api/workspaces/:id', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context);
     const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
     const input = workspaceUpdateInputSchema.parse(request.body);
     const trace = traceId(request);
@@ -49,14 +49,14 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, context: App
   });
 
   app.post('/api/workspaces/:id/disable', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context);
     const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
     const trace = traceId(request);
     return { workspace: await context.workspaceService.disable(id, user, trace), trace_id: trace };
   });
 
   app.post('/api/workspaces/:id/repositories', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context);
     const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
     const input = repositoryConfigInputSchema.parse(request.body);
     const trace = traceId(request);
@@ -64,21 +64,21 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, context: App
   });
 
   app.post('/api/repositories/:id/validate', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context);
     const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
     const trace = traceId(request);
     return { discovery: await context.workspaceService.validateRepository(id, user, trace), trace_id: trace };
   });
 
   app.post('/api/repositories/:id/describe', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context);
     const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
     const trace = traceId(request);
     return { suggestion: await context.workspaceService.describeRepository(id, user, trace), trace_id: trace };
   });
 
   app.put('/api/repositories/:id/description', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context);
     const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
     const input = descriptionConfirmationSchema.parse(request.body);
     const trace = traceId(request);
@@ -86,13 +86,13 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, context: App
   });
 
   app.post('/api/workspaces/sync', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context);
     const trace = traceId(request);
     return { sync: await context.workspaceService.syncWorkspaces(user, trace), trace_id: trace };
   });
 
   app.get('/api/workspaces/:id/health', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context);
     const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
     const workspace = context.workspaceService.detail(user, id);
     return { workspace_id: id, status: workspace.status, repositories: workspace.repositories.map((repository) => ({
@@ -103,15 +103,16 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, context: App
   });
 
   app.get('/api/workspaces/:id/members', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context);
+    requirePermission(user, 'member.manage');
     const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
     const memberIds = new Set(context.workspaceService.members(id, user).map((member) => member.user_id));
     return { items: context.users.list().filter((candidate) => memberIds.has(candidate.id)) };
   });
 
   app.put('/api/workspaces/:id/members/:userId', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
-    requireRole(user, ['admin']);
+    const user = requestUser(request, context);
+    requirePermission(user, 'member.manage');
     const { id, userId } = z.object({ id: z.string().min(1), userId: z.string().min(1) }).parse(request.params);
     if (!context.users.list().some((candidate) => candidate.id === userId)) throw new NotFoundError('用户', userId);
     const trace = traceId(request);
@@ -120,8 +121,8 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, context: App
   });
 
   app.delete('/api/workspaces/:id/members/:userId', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
-    requireRole(user, ['admin']);
+    const user = requestUser(request, context);
+    requirePermission(user, 'member.manage');
     const { id, userId } = z.object({ id: z.string().min(1), userId: z.string().min(1) }).parse(request.params);
     if (user.id === userId) throw new DomainError('CANNOT_REMOVE_SELF', '不能移除自己的工作区成员权限', '请由另一位管理员操作', 409);
     const trace = traceId(request);
@@ -130,7 +131,7 @@ export async function registerWorkspaceRoutes(app: FastifyInstance, context: App
   });
 
   app.post('/api/proposals/:id/reassign', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context);
     const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
     const input = routingReassignInputSchema.parse(request.body);
     const trace = traceId(request);

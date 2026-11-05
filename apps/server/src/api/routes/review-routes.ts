@@ -18,7 +18,7 @@ const queueQuerySchema = z.object({
 
 export async function registerReviewRoutes(app: FastifyInstance, context: AppContext): Promise<void> {
   app.get('/api/review-cases', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context);
     const query = queueQuerySchema.parse(request.query);
     context.workspaceService.requireAccess(user, query.workspace_id);
     const result = context.query.listCases({
@@ -34,7 +34,7 @@ export async function registerReviewRoutes(app: FastifyInstance, context: AppCon
   });
 
   app.get('/api/review-cases/:id', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context);
     const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
     const detail = context.query.getCaseDetail(id);
     const workspaceId = detail.review_case.workspace_id;
@@ -44,7 +44,7 @@ export async function registerReviewRoutes(app: FastifyInstance, context: AppCon
   });
 
   app.get('/api/proposals/:id', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context);
     const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
     const detail = context.query.getProposalDetail(id);
     const workspaceId = detail.proposal.workspace_id;
@@ -54,7 +54,7 @@ export async function registerReviewRoutes(app: FastifyInstance, context: AppCon
   });
 
   app.post('/api/proposals/:id/decision', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context);
     const { id } = z.object({ id: z.string().min(1) }).parse(request.params);
     const decision = decisionInputSchema.parse(request.body);
     const key = headerValue(request, 'idempotency-key');
@@ -75,7 +75,7 @@ export async function registerReviewRoutes(app: FastifyInstance, context: AppCon
   });
 
   app.get('/api/dashboard', async (request) => {
-    const user = requestUser(request, context.config.sessionSecret);
+    const user = requestUser(request, context);
     const { workspace_id: workspaceId } = z.object({ workspace_id: z.string().min(1) }).parse(request.query);
     context.workspaceService.requireAccess(user, workspaceId);
     return context.query.dashboard(workspaceId);

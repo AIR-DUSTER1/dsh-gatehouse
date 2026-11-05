@@ -42,7 +42,9 @@ export async function createHarness(databasePath = ':memory:'): Promise<TestHarn
     { id: 'user_reviewer', email: 'reviewer@test.local', name: '复核人甲', role: 'reviewer' as const, password: 'test123' },
     { id: 'user_viewer', email: 'viewer@test.local', name: '只读成员', role: 'viewer' as const, password: 'test123' },
   ]) {
-    context.users.create({ id: user.id, email: user.email, name: user.name, role: user.role, password_hash: hashPassword(user.password) });
+    const role = context.roles.findByCode(user.role);
+    if (!role) throw new Error('missing role ' + user.role);
+    context.users.create({ id: user.id, email: user.email, name: user.name, roleId: role.id, passwordHash: hashPassword(user.password), status: 'active' });
   }
 
   const admin = context.users.list().find((user) => user.role === 'admin')!;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { actionLabels, decisionLabels, riskLabels, shortHash, statusExplain, statusLabels } from '../src/lib/format';
+import { actionLabels, decisionLabels, hasPermission, permissionLabels, riskLabels, shortHash, statusExplain, statusLabels, userStatusLabels } from '../src/lib/format';
 
 describe('console presentation vocabulary', () => {
   it('covers every business status with a Chinese label and explanation', () => {
@@ -21,5 +21,14 @@ describe('console presentation vocabulary', () => {
     expect(short.startsWith('sha256:aaaaa')).toBe(true);
     expect(short.endsWith('12345678')).toBe(true);
     expect(short.length).toBeLessThan(value.length);
+  });
+});
+describe('access control vocabulary', () => {
+  it('maps permissions and checks the current permission set', () => {
+    expect(permissionLabels['user.manage']).toContain('用户');
+    expect(userStatusLabels.invited).toContain('激活');
+    expect(hasPermission({ permissions: ['review.decide'] }, 'review.decide')).toBe(true);
+    expect(hasPermission({ permissions: ['review.decide'] }, 'schedule.control')).toBe(false);
+    expect(hasPermission(null, 'workspace.read')).toBe(false);
   });
 });

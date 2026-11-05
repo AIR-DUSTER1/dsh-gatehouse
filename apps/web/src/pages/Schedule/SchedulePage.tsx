@@ -10,7 +10,7 @@ import { api, ApiError } from '../../api/client';
 import { useApiData } from '../../hooks/useApiData';
 import { useAuth } from '../../hooks/useAuth';
 import { useWorkspace, workspacePath } from '../../hooks/useWorkspace';
-import { formatFullDate } from '../../lib/format';
+import { formatFullDate, hasPermission } from '../../lib/format';
 import type { ScheduleActionResponse, ScheduleResponse } from '../../types/api';
 import { ErrorState, LoadingState, PageHeader, RiskBadge, StatusBadge } from '../../components/ui';
 
@@ -37,7 +37,7 @@ export function SchedulePage() {
   const [withdrawItem, setWithdrawItem] = useState<ScheduleListItem | null>(null);
   const [rescheduleForm] = Form.useForm<RescheduleForm>();
   const [withdrawForm] = Form.useForm<WithdrawForm>();
-  const canControl = user?.role === 'reviewer' || user?.role === 'admin';
+  const canControl = hasPermission(user, 'schedule.control');
 
   useEffect(() => {
     if (!rescheduleItem) return;

@@ -14,7 +14,7 @@ import { api, ApiError } from '../../api/client';
 import { useApiData } from '../../hooks/useApiData';
 import { useAuth } from '../../hooks/useAuth';
 import { useWorkspace, workspacePath } from '../../hooks/useWorkspace';
-import { actionLabels, decisionLabels, formatFullDate, riskLabels, shortHash, sourceLabel, statusExplain, statusLabels } from '../../lib/format';
+import { actionLabels, decisionLabels, formatFullDate, hasPermission, riskLabels, shortHash, sourceLabel, statusExplain, statusLabels } from '../../lib/format';
 import { Avatar as PersonAvatar, ErrorState, LoadingState, RiskBadge, SourceBadge, StatusBadge } from '../../components/ui';
 import type { DecisionResponse } from '../../types/api';
 
@@ -40,7 +40,7 @@ export function CaseDetailPage() {
   const [routingSaving, setRoutingSaving] = useState(false);
   const proposal = data?.proposals[0] ?? null;
   const latestDecision = data?.decisions[0] ?? null;
-  const isReviewer = user?.role === 'reviewer' || user?.role === 'admin';
+  const isReviewer = hasPermission(user, 'review.decide');
   const selfApproval = Boolean(data && user?.name === data.review_case.requester);
   const canReview = Boolean(proposal?.status === 'pending_review' && isReviewer);
 

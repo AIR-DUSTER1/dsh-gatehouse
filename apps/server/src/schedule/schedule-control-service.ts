@@ -8,7 +8,7 @@ import type { AuditService } from '../audit/audit-service.js';
 import type { ReviewRepository } from '../repositories/review-repository.js';
 import type { ProposalRepository } from '../repositories/proposal-repository.js';
 import { DomainError, NotFoundError } from '../domain/errors.js';
-import { requireRole } from '../auth.js';
+import { requirePermission } from '../auth.js';
 import { newId, nowIso } from '../domain/utils.js';
 import type { PluginScheduleRequest, PluginWithdrawRequest } from '../plugin/plugin-client.js';
 import type { WorkspaceService } from '../domain/workspace-service.js';
@@ -28,7 +28,7 @@ export class ScheduleControlService {
   ) {}
 
   pause(scheduleId: string, user: User, traceId: string, now = new Date()): void {
-    requireRole(user, ['reviewer', 'admin']);
+    requirePermission(user, 'schedule.control');
     const schedule = this.requireControllable(scheduleId);
     if (schedule.status !== 'scheduled') throw new DomainError('SCHEDULE_NOT_PAUSABLE', '只有待执行排期可以暂停', '刷新排期状态后重试', 409);
     const at = nowIso(now);
@@ -42,7 +42,7 @@ export class ScheduleControlService {
   }
 
   resume(scheduleId: string, user: User, traceId: string, now = new Date()): void {
-    requireRole(user, ['reviewer', 'admin']);
+    requirePermission(user, 'schedule.control');
     const schedule = this.requireControllable(scheduleId);
     if (schedule.status !== 'paused') throw new DomainError('SCHEDULE_NOT_RESUMABLE', '只有已暂停排期可以恢复', '刷新排期状态后重试', 409);
     if (Date.parse(schedule.expires_at) <= now.getTime()) throw new DomainError('GRANT_EXPIRED', '审批授权已过期，不能恢复', '重新发起审批', 409);
@@ -58,7 +58,7 @@ export class ScheduleControlService {
 
   /** Change an active schedule and invalidate its plugin sync until the new Grant is delivered. */
   reschedule(scheduleId: string, input: ScheduleChangeInput, user: User, traceId: string, now = new Date()): void {
-    requireRole(user, ['reviewer', 'admin']);
+    requirePermission(user, 'schedule.control');
     const schedule = this.requireControllable(scheduleId);
     if (!['scheduled', 'paused'].includes(schedule.status)) {
       throw new DomainError('SCHEDULE_NOT_EDITABLE', '只有待执行或已暂停的排期可以修改', '执行开始后不能再修改排期', 409);
@@ -96,7 +96,7 @@ export class ScheduleControlService {
       };
       this.outbox.enqueue({ id: newId('outbox'), topic: 'plugin.reschedule', aggregateId: proposal.id,
         idempotencyKey: `reschedule:${operationId}`, payload, maxAttempts: this.pluginMaxAttempts, createdAt: at });
-      this.audit.record({ entityType: 'review_case', entityId: reviewCase.id, action: 'schedule.rescheduled', actor: user.name,
+      this.audit.record({ entityType: 'review_case', entityId: reviewCase.id, action: 'schedule.rescheduled', actor: user.name, actorUserId: user.id,
         before: { schedule_at: schedule.schedule_at, expires_at: schedule.expires_at, status: schedule.status },
         after: { schedule_at: scheduleAt, expires_at: expiresAt, status: 'scheduled', reason: input.reason },
         traceId, at, workspaceId });
@@ -105,7 +105,7 @@ export class ScheduleControlService {
 
   /** Revoke the active Grant, cancel the schedule and return the Proposal to human review. */
   withdraw(scheduleId: string, input: ScheduleWithdrawInput, user: User, traceId: string, now = new Date()): void {
-    requireRole(user, ['reviewer', 'admin']);
+    requirePermission(user, 'schedule.control');
     const schedule = this.requireControllable(scheduleId);
     if (!['scheduled', 'paused'].includes(schedule.status)) {
       throw new DomainError('SCHEDULE_NOT_WITHDRAWABLE', '只有待执行或已暂停的排期可以撤回', '执行开始后不能撤回', 409);
@@ -137,7 +137,7 @@ export class ScheduleControlService {
       };
       this.outbox.enqueue({ id: newId('outbox'), topic: 'plugin.withdraw', aggregateId: proposal.id,
         idempotencyKey: `withdraw:${operationId}`, payload, maxAttempts: this.pluginMaxAttempts, createdAt: at });
-      this.audit.record({ entityType: 'review_case', entityId: reviewCase.id, action: 'schedule.withdrawn', actor: user.name,
+      this.audit.record({ entityType: 'review_case', entityId: reviewCase.id, action: 'schedule.withdrawn', actor: user.name, actorUserId: user.id,
         before: { schedule_at: schedule.schedule_at, status: schedule.status, grant_status: grant.status },
         after: { status: 'cancelled', proposal_status: 'pending_review', reason }, traceId, at, workspaceId });
     });
@@ -145,7 +145,7 @@ export class ScheduleControlService {
 
   /** Retry a dead execution dispatcher message with the same execution id, when the Grant is still usable. */
   retryExecution(scheduleId: string, user: User, traceId: string, now = new Date()): void {
-    requireRole(user, ['reviewer', 'admin']);
+    requirePermission(user, 'schedule.control');
     const schedule = this.schedules.get(scheduleId);
     if (!schedule) throw new NotFoundError('排期', scheduleId);
     if (schedule.status !== 'failed' || !schedule.execution_id) {
@@ -174,7 +174,7 @@ export class ScheduleControlService {
       this.schedules.markRetryExecuting(schedule.id, at);
       this.proposals.setStatus(proposal.id, 'executing', at);
       this.cases.setStatus(reviewCase.id, 'executing', at);
-      this.audit.record({ entityType: 'review_case', entityId: reviewCase.id, action: 'execution.retry_requested', actor: user.name,
+      this.audit.record({ entityType: 'review_case', entityId: reviewCase.id, action: 'execution.retry_requested', actor: user.name, actorUserId: user.id,
         before: { status: schedule.status, outbox_id: dead.id }, after: { status: 'executing', execution_id: schedule.execution_id },
         traceId, at, workspaceId });
     });
@@ -194,7 +194,7 @@ export class ScheduleControlService {
     const proposal = this.proposals.get(proposalId);
     const reviewCase = proposal ? this.cases.get(proposal.review_case_id) : null;
     if (!reviewCase) return;
-    this.audit.record({ entityType: 'review_case', entityId: reviewCase.id, action, actor: user.name, before, after,
+    this.audit.record({ entityType: 'review_case', entityId: reviewCase.id, action, actor: user.name, actorUserId: user.id, before, after,
       traceId, at, workspaceId });
   }
 

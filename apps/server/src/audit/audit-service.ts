@@ -7,6 +7,7 @@ export interface AuditInput {
   entityId: string;
   action: string;
   actor: string;
+  actorUserId?: string | null;
   before?: unknown;
   after?: unknown;
   traceId: string;
@@ -25,6 +26,7 @@ export class AuditService {
       entity_id: input.entityId,
       action: input.action,
       actor: input.actor,
+      actor_user_id: input.actorUserId ?? null,
       before: input.before ?? null,
       after: input.after ?? null,
       trace_id: input.traceId,

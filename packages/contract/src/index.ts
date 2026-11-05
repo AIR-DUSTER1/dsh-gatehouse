@@ -48,8 +48,57 @@ export type RoutingMode = (typeof ROUTING_MODES)[number];
 export const DECISIONS = ['approve', 'reject', 'request_info'] as const;
 export type DecisionType = (typeof DECISIONS)[number];
 
-export const ROLES = ['viewer', 'reviewer', 'admin'] as const;
-export type Role = (typeof ROLES)[number];
+export const BUILT_IN_ROLE_CODES = ['viewer', 'reviewer', 'admin'] as const;
+export type BuiltInRoleCode = (typeof BUILT_IN_ROLE_CODES)[number];
+export const ROLES = BUILT_IN_ROLE_CODES;
+/** Built-in and custom role code. Built-in codes are seeded by the database migration. */
+export type Role = string;
+
+export const PERMISSIONS = [
+  'workspace.read',
+  'workspace.manage',
+  'member.manage',
+  'repository.manage',
+  'review.read',
+  'review.decide',
+  'review.reassign',
+  'schedule.read',
+  'schedule.control',
+  'execution.read',
+  'audit.read',
+  'analytics.global',
+  'settings.read',
+  'settings.manage',
+  'user.manage',
+  'role.manage',
+] as const;
+export type PermissionCode = (typeof PERMISSIONS)[number];
+
+export const USER_STATUSES = ['invited', 'active', 'disabled'] as const;
+export type UserStatus = (typeof USER_STATUSES)[number];
+
+export interface PermissionRecord {
+  code: PermissionCode;
+  group_key: string;
+  name: string;
+  description: string;
+  admin_only: boolean;
+  sort_order: number;
+}
+
+export interface RoleRecord {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  is_system: boolean;
+  editable: boolean;
+  status: 'active' | 'archived';
+  permissions: PermissionCode[];
+  user_count: number;
+  created_at: string;
+  updated_at: string;
+}
 
 export const HASH_PATTERN = /^sha256:[a-f0-9]{64}$/;
 export const hashSchema = z.string().regex(HASH_PATTERN, 'must be a sha256:<64 lowercase hex> value');
@@ -58,8 +107,17 @@ export const isoDateSchema = z.iso.datetime({ offset: true });
 export interface User {
   id: string;
   name: string;
-  role: Role;
   email: string;
+  role: Role;
+  role_id: string;
+  role_name: string;
+  status: UserStatus;
+  permissions: PermissionCode[];
+  workspace_ids: string[];
+  last_login_at: string | null;
+  password_changed_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface SessionUser extends User {
@@ -155,6 +213,7 @@ export interface AuditEventRecord {
   entity_id: string;
   action: string;
   actor: string;
+  actor_user_id?: string | null;
   before: unknown;
   after: unknown;
   trace_id: string;
