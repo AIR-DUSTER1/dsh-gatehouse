@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkspaceListItem } from '@gatehouse/contract';
 import {
@@ -9,6 +11,15 @@ import {
   workspacePath,
   workspaceSuffix,
 } from '../src/lib/workspace-routes';
+
+function webSourceFiles(): string[] {
+  const root = fileURLToPath(new URL('../src', import.meta.url));
+  const visit = (directory: string): string[] => readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    return entry.isDirectory() ? visit(path) : /\.(ts|tsx)$/.test(entry.name) ? [path] : [];
+  });
+  return visit(root);
+}
 
 function workspace(id: string, status: WorkspaceListItem['status'], repositories = 0): WorkspaceListItem {
   return {
@@ -59,6 +70,14 @@ describe('frontend architecture boundaries', () => {
     expect(source).not.toContain("react-router-dom");
     expect(source).not.toContain('workspaceIdFromPath');
     expect(source).not.toContain('localStorage');
+  });
+
+  it('rejects legacy prop typing and any escapes in web source', () => {
+    const violations = webSourceFiles().flatMap((file) => {
+      const source = readFileSync(file, 'utf8');
+      return /\bReact\.FC\b|\bPropTypes\b|:\s*any\b|\bas\s+any\b|<any>/u.test(source) ? [file] : [];
+    });
+    expect(violations).toEqual([]);
   });
 
   it('keeps the root App module as composition only and route definitions in the router', () => {
