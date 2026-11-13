@@ -3,14 +3,15 @@ import { Alert, Button, Card, Col, Empty, Flex, Row, Space, Statistic, Typograph
 import { CheckCircleOutlined, ClockCircleOutlined, ExportOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons';
 import type { ScheduleResponse } from '../../types/api';
 import { useApiData } from '../../hooks/useApiData';
-import { useWorkspace, workspacePath } from '../../hooks/useWorkspace';
+import { workspacePath } from '../../lib/workspace-routes';
+import { useCurrentWorkspace } from '../../router/useCurrentWorkspace';
 import { formatFullDate, shortHash } from '../../lib/format';
 import { ErrorState, LoadingState, PageHeader, RiskBadge, StatusBadge } from '../../components/ui';
 
 const { Text, Title } = Typography;
 
 export function ExecutionPage() {
-  const { currentId } = useWorkspace();
+  const { currentId } = useCurrentWorkspace();
   const workspaceId = currentId ?? '';
   const { data, loading, error, reload } = useApiData<ScheduleResponse>(`/api/schedule?workspace_id=${encodeURIComponent(workspaceId)}`);
   if (loading) return <LoadingState label="正在加载交付记录…" />;

@@ -14,7 +14,7 @@ import {
 import type { AnalyticsOverview, AnalyticsWorkspaceRow } from '@gatehouse/contract';
 import { useApiData } from '../../hooks/useApiData';
 import { formatFullDate } from '../../lib/format';
-import { workspacePath } from '../../hooks/useWorkspace';
+import { workspacePath } from '../../lib/workspace-routes';
 import { ErrorState, LoadingState, PageHeader } from '../../components/ui';
 
 echarts.use([LineChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer]);

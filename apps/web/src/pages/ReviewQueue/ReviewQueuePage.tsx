@@ -6,7 +6,8 @@ import { ReloadOutlined, SearchOutlined } from '@ant-design/icons';
 import type { ReviewQueueItem } from '@gatehouse/contract';
 import type { ReviewQueueResponse } from '../../types/api';
 import { useApiData } from '../../hooks/useApiData';
-import { useWorkspace, workspacePath } from '../../hooks/useWorkspace';
+import { workspacePath } from '../../lib/workspace-routes';
+import { useCurrentWorkspace } from '../../router/useCurrentWorkspace';
 import { formatDate, sourceLabel } from '../../lib/format';
 import { Avatar, ErrorState, PageHeader, RiskBadge, SourceBadge, StatusBadge } from '../../components/ui';
 
@@ -17,7 +18,7 @@ const statusTabs = [
 ];
 
 export function ReviewQueuePage() {
-  const { currentId } = useWorkspace();
+  const { currentId } = useCurrentWorkspace();
   const workspaceId = currentId ?? '';
   const [status, setStatus] = useState('pending_review');
   const [risk, setRisk] = useState<string>();

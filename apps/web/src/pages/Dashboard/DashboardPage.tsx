@@ -6,7 +6,8 @@ import {
 import type { DashboardResponse, ReviewQueueResponse } from '../../types/api';
 import { useApiData } from '../../hooks/useApiData';
 import { useAuth } from '../../hooks/useAuth';
-import { useWorkspace, workspacePath } from '../../hooks/useWorkspace';
+import { workspacePath } from '../../lib/workspace-routes';
+import { useCurrentWorkspace } from '../../router/useCurrentWorkspace';
 import { actionLabels, formatDate, relativeTime, riskLabels } from '../../lib/format';
 import { ErrorState, LoadingState, PageHeader, RiskBadge, SourceBadge } from '../../components/ui';
 
@@ -16,7 +17,7 @@ const riskBarColors: Record<string, string> = { critical: '#c73325', high: '#e84
 
 export function DashboardPage() {
   const { user } = useAuth();
-  const { current, currentId } = useWorkspace();
+  const { current, currentId } = useCurrentWorkspace();
   const workspaceId = currentId ?? '';
   const { data, loading, error, reload } = useApiData<DashboardResponse>(`/api/dashboard?workspace_id=${encodeURIComponent(workspaceId)}`);
   const { data: queue } = useApiData<ReviewQueueResponse>(`/api/review-cases?workspace_id=${encodeURIComponent(workspaceId)}&status=pending_review&page=1&page_size=4`);

@@ -12,7 +12,8 @@ import {
 import type { RepositoryDescriptionSuggestion, RepositoryDiscovery, RepositoryProvider, User, WorkspaceListItem, WorkspaceRepositoryRecord } from '@gatehouse/contract';
 import { api, ApiError } from '../../api/client';
 import { useAuth } from '../../hooks/useAuth';
-import { useWorkspace, workspacePath } from '../../hooks/useWorkspace';
+import { useWorkspace } from '../../hooks/useWorkspace';
+import { workspacePath } from '../../lib/workspace-routes';
 import { formatFullDate, hasPermission } from '../../lib/format';
 import { Badge, ErrorState, LoadingState, PageHeader } from '../../components/ui';
 import type {

@@ -7,7 +7,8 @@ import {
   RocketOutlined, SafetyCertificateOutlined, SettingOutlined, TeamOutlined, UserSwitchOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../hooks/useAuth';
-import { useWorkspace, workspacePath, workspaceSuffix } from '../hooks/useWorkspace';
+import { workspacePath, workspaceSuffix } from '../lib/workspace-routes';
+import { useCurrentWorkspace } from '../router/useCurrentWorkspace';
 import type { User } from '@gatehouse/contract';
 import { hasPermission } from '../lib/format';
 
@@ -61,7 +62,7 @@ function routeTitle(pathname: string) {
 function Navigation({ onNavigate }: { onNavigate?: () => void }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentId, preferred } = useWorkspace();
+  const { currentId, preferred } = useCurrentWorkspace();
   const suffix = workspaceSuffix(location.pathname);
   const navigationId = currentId ?? preferred?.id ?? null;
   const selected = currentId
@@ -99,7 +100,7 @@ function ProviderMark({ provider }: { provider: string }) {
 
 export function AppShell() {
   const { user, logout } = useAuth();
-  const { workspaces, current, preferred, currentId, loading } = useWorkspace();
+  const { workspaces, current, preferred, currentId, loading } = useCurrentWorkspace();
   const navigate = useNavigate();
   const location = useLocation();
   const screens = Grid.useBreakpoint();

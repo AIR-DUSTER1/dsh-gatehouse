@@ -13,7 +13,8 @@ import type { DecisionType, ReviewCaseDetail } from '@gatehouse/contract';
 import { api, ApiError } from '../../api/client';
 import { useApiData } from '../../hooks/useApiData';
 import { useAuth } from '../../hooks/useAuth';
-import { useWorkspace, workspacePath } from '../../hooks/useWorkspace';
+import { workspacePath } from '../../lib/workspace-routes';
+import { useCurrentWorkspace } from '../../router/useCurrentWorkspace';
 import { actionLabels, decisionLabels, formatFullDate, hasPermission, riskLabels, shortHash, sourceLabel, statusExplain, statusLabels } from '../../lib/format';
 import { Avatar as PersonAvatar, ErrorState, LoadingState, RiskBadge, SourceBadge, StatusBadge } from '../../components/ui';
 import type { DecisionResponse } from '../../types/api';
@@ -25,7 +26,7 @@ interface DecisionForm { comment: string; risk_confirmed: boolean; schedule_at?:
 export function CaseDetailPage() {
   const { id = '' } = useParams();
   const { user } = useAuth();
-  const { currentId, workspaces } = useWorkspace();
+  const { currentId, workspaces } = useCurrentWorkspace();
   const workspaceId = currentId ?? '';
   const { message } = AntdApp.useApp();
   const [form] = Form.useForm<DecisionForm>();

@@ -5,7 +5,7 @@ import { LockOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { AuditEventRecord } from '@gatehouse/contract';
 import type { AuditResponse } from '../../types/api';
 import { useApiData } from '../../hooks/useApiData';
-import { useWorkspace } from '../../hooks/useWorkspace';
+import { useCurrentWorkspace } from '../../router/useCurrentWorkspace';
 import { actionLabels, formatFullDate } from '../../lib/format';
 import { Badge, ErrorState, PageHeader } from '../../components/ui';
 
@@ -17,7 +17,7 @@ const actionOptions = [
 ];
 
 export function AuditPage() {
-  const { currentId } = useWorkspace();
+  const { currentId } = useCurrentWorkspace();
   const workspaceId = currentId ?? '';
   const [action, setAction] = useState<string>();
   const [search, setSearch] = useState('');

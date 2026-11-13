@@ -9,7 +9,8 @@ import dayjs, { type Dayjs } from 'dayjs';
 import { api, ApiError } from '../../api/client';
 import { useApiData } from '../../hooks/useApiData';
 import { useAuth } from '../../hooks/useAuth';
-import { useWorkspace, workspacePath } from '../../hooks/useWorkspace';
+import { workspacePath } from '../../lib/workspace-routes';
+import { useCurrentWorkspace } from '../../router/useCurrentWorkspace';
 import { formatFullDate, hasPermission } from '../../lib/format';
 import type { ScheduleActionResponse, ScheduleResponse } from '../../types/api';
 import { ErrorState, LoadingState, PageHeader, RiskBadge, StatusBadge } from '../../components/ui';
@@ -28,7 +29,7 @@ interface WithdrawForm { reason: string }
 
 export function SchedulePage() {
   const { user } = useAuth();
-  const { currentId } = useWorkspace();
+  const { currentId } = useCurrentWorkspace();
   const workspaceId = currentId ?? '';
   const { message } = AntdApp.useApp();
   const { data, loading, error, reload } = useApiData<ScheduleResponse>(`/api/schedule?workspace_id=${encodeURIComponent(workspaceId)}`);
