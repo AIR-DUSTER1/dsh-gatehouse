@@ -3,25 +3,14 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
-const TYPES = new Set([
-  "feat",
-  "fix",
-  "refactor",
-  "perf",
-  "test",
-  "docs",
-  "style",
-  "build",
-  "ci",
-  "chore",
-  "revert",
-  "merge",
-]);
-
-const HEADER_MAX = 100;
-const SUBJECT_MAX = 72;
-const HEADER_RE = /^(?<type>[a-z]+)(?:\((?<scope>[a-z0-9][a-z0-9._/-]*)\))?(?<breaking>!)?: (?<subject>.+)$/;
+const TYPES = new Set(["feat", "fix", "refactor", "style", "i18n", "chore"]);
+const COMMIT_RE = /^(?<type>[a-z]+): (?<subject>.+)$/u;
+const HAN_RE = /\p{Script=Han}/u;
+const END_PUNCTUATION_RE = /[。.!！?？;；,，:：]$/u;
+const NUMBERED_LIST_RE = /^\d+[.、)）]\s+/u;
+const VAGUE_SUBJECT_RE = /^(?:wip|update|changes|fix bug)$/iu;
 
 function usage() {
   console.error(
@@ -37,7 +26,7 @@ function cleanMessage(raw) {
     .trim();
 }
 
-function validateMessage(raw, source) {
+export function validateMessage(raw, source) {
   const message = cleanMessage(raw);
   const lines = message.split(/\r?\n/);
   const header = lines[0]?.trim() ?? "";
@@ -48,40 +37,35 @@ function validateMessage(raw, source) {
     return { errors, header, source };
   }
 
-  const match = HEADER_RE.exec(header);
+  const match = COMMIT_RE.exec(header);
   if (!match?.groups) {
     errors.push(
-      "header 必须符合 `<type>(<scope>)!: <subject>`，例如 `feat(web): add status filter`",
+      "提交信息必须符合单行格式 `<type>: <中文主题>，<具体变更>`，不允许 scope、! 或正文",
     );
   } else {
-    const { type, subject, breaking } = match.groups;
+    const { type, subject } = match.groups;
     if (!TYPES.has(type)) {
       errors.push(`不允许的 type \`${type}\`；允许：${[...TYPES].join(", ")}`);
     }
-    if (!subject || subject.trim() !== subject) {
-      errors.push("subject 不能为空或带有首尾空白");
+    if (subject.trim() !== subject) {
+      errors.push("主题不能带有首尾空白");
     }
-    if (subject.endsWith(".")) {
-      errors.push("subject 不能以句号结尾");
+    if (!HAN_RE.test(subject)) {
+      errors.push("主题必须使用中文描述");
     }
-    if ([...subject].length > SUBJECT_MAX) {
-      errors.push(`subject 不能超过 ${SUBJECT_MAX} 个字符`);
+    if (END_PUNCTUATION_RE.test(subject)) {
+      errors.push("主题末尾不能带句号或其它标点");
     }
-    if (breaking && !lines.slice(1).some((line) => /^BREAKING(?: |-)CHANGE: /.test(line))) {
-      errors.push("使用 `!` 时必须在 footer 添加 `BREAKING CHANGE: ...`");
+    if (NUMBERED_LIST_RE.test(subject)) {
+      errors.push("主题不能使用序号列表");
+    }
+    if (VAGUE_SUBJECT_RE.test(subject)) {
+      errors.push("主题不能使用 WIP、update、changes、fix bug 等空泛描述");
     }
   }
 
-  if ([...header].length > HEADER_MAX) {
-    errors.push(`header 不能超过 ${HEADER_MAX} 个字符`);
-  }
-  if (lines.length > 1 && lines[1].trim() !== "") {
-    errors.push("header 与正文之间必须空一行");
-  }
-  for (const [index, line] of lines.slice(1).entries()) {
-    if (line.length > 100 && !/^https?:\/\//.test(line.trim())) {
-      errors.push(`第 ${index + 2} 行超过 100 个字符`);
-    }
+  if (lines.length !== 1) {
+    errors.push("整个提交信息只能有一行，不能包含空行、正文或 footer");
   }
 
   return { errors, header, source };
@@ -153,9 +137,12 @@ function main() {
   report([validateMessage(readFileOrThrow(mode), mode)]);
 }
 
-try {
-  main();
-} catch (error) {
-  console.error(`提交信息校验失败：${error instanceof Error ? error.message : String(error)}`);
-  process.exitCode = 2;
+const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : "";
+if (import.meta.url === invokedPath) {
+  try {
+    main();
+  } catch (error) {
+    console.error(`提交信息校验失败：${error instanceof Error ? error.message : String(error)}`);
+    process.exitCode = 2;
+  }
 }

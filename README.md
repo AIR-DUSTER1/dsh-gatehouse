@@ -39,7 +39,6 @@
 - [常见问题](#常见问题)
 - [参与贡献](#参与贡献)
 - [相关仓库与来源](#相关仓库与来源)
-- [许可证](#许可证)
 
 ## 项目简介
 
@@ -365,7 +364,3 @@ DSH Superagent Review 来源于开源项目 **dsh-superagent**：
 <https://github.com/deepseek-ai/dsh-superagent-prototype>
 
 Gatehouse 不是 DeepSeek 官方产品，也不代表 DeepSeek 官方立场。
-
-## 许可证
-
-Gatehouse 仓库当前尚未添加根目录 `LICENSE` 文件。若计划公开分发、商业使用或接受外部代码贡献，请先由维护者确定并补充许可证。

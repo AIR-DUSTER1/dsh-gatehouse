@@ -7,11 +7,12 @@
     "prepare": "node scripts/install-git-hooks.mjs",
     "hooks:install": "node scripts/install-git-hooks.mjs",
     "commit:check": "node scripts/validate-commit-message.mjs --last",
+    "test:commit": "node --test scripts/validate-commit-message.test.mjs",
     "dev": "concurrently -k -n server,web -c cyan,magenta \"pnpm --filter @gatehouse/server dev\" \"pnpm --filter @gatehouse/web dev\"",
     "dev:server": "pnpm --filter @gatehouse/server dev",
     "dev:web": "pnpm --filter @gatehouse/web dev",
     "build": "pnpm --filter @gatehouse/contract build && pnpm --filter @gatehouse/server build && pnpm --filter @gatehouse/web build",
-    "test": "pnpm --filter @gatehouse/contract test && pnpm --filter @gatehouse/server test && pnpm --filter @gatehouse/web test",
+    "test": "pnpm test:commit && pnpm --filter @gatehouse/contract test && pnpm --filter @gatehouse/server test && pnpm --filter @gatehouse/web test",
     "typecheck": "pnpm --filter @gatehouse/contract typecheck && pnpm --filter @gatehouse/server typecheck && pnpm --filter @gatehouse/web typecheck",
     "start": "pnpm --filter @gatehouse/server start",
     "browser:smoke": "node scripts/browser-smoke.mjs"

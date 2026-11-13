@@ -60,7 +60,7 @@ pnpm dev
 常用验证命令：
 
 ```powershell
-pnpm test          # contract + server + web 测试
+pnpm test          # contract + server + web + 提交规范测试
 pnpm typecheck     # 全工作区 TypeScript 检查
 pnpm build         # 服务端类型检查 + Web 生产构建
 pnpm browser:smoke # 需先启动 pnpm dev，并使用本机 Chrome
@@ -130,53 +130,63 @@ pnpm commit:check  # 校验当前 HEAD 的提交信息
 
 ### Commit message
 
-采用 Conventional Commits，格式为：
+整个提交信息只有一行，不换行，不分标题和正文：
 
 ```text
-<type>(<scope>)!: <subject>
+<type>: <主题概括>，<具体变更1>，<具体变更2>，<具体变更3>
 ```
-
-`scope` 可省略；`!` 仅用于不兼容变更，并必须在正文 footer 中补充 `BREAKING CHANGE: ...`。
 
 允许的 `type`：
 
 | type | 用途 |
 | --- | --- |
-| `feat` | 新增用户可见能力 |
-| `fix` | 修复缺陷 |
-| `refactor` | 不改变行为的重构 |
-| `perf` | 性能优化 |
-| `test` | 测试相关 |
-| `docs` | 文档 |
-| `style` | 格式或样式整理，不改变逻辑 |
-| `build` | 构建系统或依赖 |
-| `ci` | CI/CD |
-| `chore` | 维护工作 |
-| `revert` | 回滚提交 |
-| `merge` | 合并提交 |
+| `feat` | 新功能 |
+| `fix` | 修复缺陷、小改动、补漏、调整 |
+| `refactor` | 大规模重构 |
+| `style` | 样式调整 |
+| `i18n` | 国际化相关 |
+| `chore` | 构建、依赖或工具 |
 
-推荐 `scope`：`contract`、`server`、`web`、`api`、`db`、`scheduler`、`plugin`、`auth`、`ui`、`docs`、`deps`、`ci`、`repo`。
+`refactor` 仅用于同时满足以下条件的大改动：
 
-示例：
+- 涉及 5 个及以上文件的结构调整
+- 改变整体架构或设计模式
+- 替换技术方案或重新组织目录结构
 
-```text
-feat(web): add schedule conflict warning
-fix(server): reject expired approval grant
-refactor(scheduler): isolate due job selection
-test(contract): cover signature replay
-docs: explain plugin retry policy
-chore(deps): bump fastify
-```
+凡是不满足上述全部条件的改动，一律使用 `fix`。
 
 硬性要求：
 
-- subject 必须描述实际变更，使用祈使语气，长度不超过 72 个字符，不以句号结尾。
-- header 总长度不超过 100 个字符；正文与 header 之间空一行。
-- 一个 commit 只做一个可解释的逻辑变更；不要把无关格式化混入业务提交。
-- 禁止 `WIP`、`update`、`fix bug`、`changes` 等空泛描述。
-- 不把生成物、数据文件、密钥或临时调试文件加入提交。
-- 不使用 `--no-verify`；不使用 `git commit --amend` 修改已推送提交；不在 `main` 上 force push。
-- 发现提交信息错误时，优先追加符合规范的提交；尚未推送且由本人创建的提交可在确认影响范围后修正。
+- 类型后使用半角冒号和空格：`fix: `，不得写成 `fix：` 或 `fix:`。
+- 主题使用中文，简明描述实际变更。
+- 优先写明受影响的页面、模块或组件。
+- 不使用句号或其它句末标点。
+- 一个提交只做一个主题，不混合互不相关的变更。
+- 严格区分 `fix` 和 `refactor`；补漏、调整、局部修复不得使用 `refactor`。
+
+严格禁止：
+
+- 多行提交信息、空行分隔的标题与正文。
+- `1.`、`2.` 等序号列表。
+- 先写概括再另起一段重复展开。
+- scope、`!` 或单独的 footer。
+- `WIP`、`update`、`changes`、`fix bug` 等空泛描述。
+- 使用 `--no-verify` 绕过提交校验。
+- 提交 `.env`、Token、真实姓名、邮箱、SQLite 数据、生成物或临时调试文件。
+
+正确示例：
+
+```text
+fix: 修复 BasicTable 组件类型定义缺失问题，补充 flexHeight 和 rowClassName 属性，为 useDataSource 添加参数类型接口，修复 checkedRowKeys 的 Set 泛型类型不兼容
+```
+
+错误示例：
+
+```text
+fix: 修复 BasicTable 组件类型定义
+
+fix: 补充 flexHeight、rowClassName、size 等缺失属性到 BasicTableProps 接口
+```
 
 ### 自动校验
 
