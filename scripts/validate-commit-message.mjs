@@ -6,7 +6,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const TYPES = new Set(["feat", "fix", "refactor", "style", "i18n", "chore"]);
-const COMMIT_RE = /^(?<type>[a-z]+): (?<subject>.+)$/u;
+const COMMIT_RE = /^(?<type>[a-z0-9]+): (?<subject>.+)$/u;
 const HAN_RE = /\p{Script=Han}/u;
 const END_PUNCTUATION_RE = /[。.!！?？;；,，:：]$/u;
 const NUMBERED_LIST_RE = /^\d+[.、)）]\s+/u;
